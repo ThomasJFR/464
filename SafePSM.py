@@ -2,11 +2,18 @@ import dvrk
 import numpy as np
 
 class SafePSM1(dvrk.psm):
-    def __init__(self, arm_name="PSM1"):
+    def __init__(self, autostart=True, arm_name="PSM1"):
         super(dvrk.psm, self).__init__(arm_name) 
         #self.xbound = [0, 0]
         self.ybound = [0, 0]
         #self.zbound = [0, 0]
+
+        if autostart:
+            self.start()
+
+    def start(self):
+        self.enable()
+        self.home()
 
     def safe_home(self):
         """
