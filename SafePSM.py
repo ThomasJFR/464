@@ -1,12 +1,14 @@
 import dvrk
 import numpy as np
+from math import radians
 
 class SafePSM1(dvrk.psm):
     def __init__(self, autostart=True, arm_name="PSM1"):
-        super(dvrk.psm, self).__init__(arm_name) 
+        #super(dvrk.psm, self).__init__(arm_name)
         #self.xbound = [0, 0]
         self.ybound = [0, 0]
         #self.zbound = [0, 0]
+        dvrk.psm.__init__(self, arm_name)
 
         if autostart:
             self.start()
@@ -37,6 +39,12 @@ class SafePSM1(dvrk.psm):
         self.ybound[0] = pos[1]
         #self.ybound[1] = 5  # TODO bounding function 
         
+    def open(self, angle=radians(60)):
+        return self.jaw.open(angle)
+
+    def close(self):
+        return self.jaw.close()
+
     def safe_move_dcp(self, dx=0, dy=0, dz=0):
         """
         Move in cartesian space by the specified amounts.
