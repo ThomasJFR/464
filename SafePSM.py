@@ -115,11 +115,11 @@ class SafePSM(psm):
         # If the move was not safe, determine what to do
         print("Requested move is beyond the safezone!")
         if aggressive:
-            new_x, new_y, new_z  = self.constrain_to_safezone(target.p)
+            new_x, new_y, new_z = self.constrain_to_safezone(target.p)
             target.p[0] = new_x
             target.p[1] = new_y
             target.p[2] = new_z 
-            return self.move_cp(self.constrain_to_safezone(target))
+            return self.move_cp(target)
         else:
             return FailWaiter()
 
@@ -146,8 +146,12 @@ class PSMController:
         
         self._yzone = []  # Specifies the y domain for the entire system
         self._bpy = 0  # The y-position of the XZ bounding plane
-        self._bpb = 0.05 # The XZ bounding plane buffer [m]
-    
+        self._bpyb = 0.05 # The XZ bounding plane buffer [m]
+        self._bpz = 0
+        self._bpzb = 0.05
+        
+        self._bp_access = self._psm1
+
     def init(self, yzone=[]):
         if yzone:  # Specify the zone manually
             self._yzone = yzone
@@ -159,19 +163,28 @@ class PSMController:
             self._psm2.measured_cp().p[1],
         ]
 
-    def update(self):
+    def update(self, bpy=None):
         """
         Automatically updates the boundaries for each of the PSMs
         """
+        if bpy is not None:
+            self._bpy = bpy
+
+        # Update boundaries for each PSM object
         self._psm1.set_safezone(ybounds=[
             self._yzone[0], 
-            self._bpy - self._bpb])
+            self._bpy - (0 if self._bp_access is self._psm1 else self._bpyb])
         self._psm2.set_safezone(ybounds=[
-            self._bpy - self._bpb,
+            self._bpy + (0 if self._bp_access is self._psm1 else self._bpyb]),
             self._yzone[1]])
 
+        # Move the arms if they are now out-of-bounds
+        #wait1 = self._psm1.safe_move_pos().wait()
+        #wait2 = self._psm2.safe_move_pos().wait()
+        
 
 class PSMBoundary:
+    # OUTDATED
     def __init__(self, PSM1, PSM2):
         self._PSM1 = PSM1
         self._PSM2 = PSM2
