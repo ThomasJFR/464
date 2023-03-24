@@ -1,4 +1,3 @@
-#%%
 # MECH 464 Group 1
 # This file is the primary file for running the 
 # Pick and place operation. It contains the main while loop
@@ -9,7 +8,10 @@ import numpy as np
 import threading
 import dvrk
 import PyKDL
+from collections import deque
 
+targets = deque()
+bowls = list()
 
 def traverseToLocation(p, delta) -> None:
     """
@@ -63,6 +65,37 @@ def goHome(p) -> None:
     
     return
 
+def capture_system():
+    "Function that gets a photo of the system that we can extract features from"
+    pass
+
+def extract_features(image):
+    """
+    Extract targets and bowls from an image
+    """
+    # Process image to identify positions of targets and bowls
+
+    # Dummy logic:
+    targets_list = [
+        np.array([-1.527791262, 0.05018193647, 0.674774766]),
+        np.array([-1.516814113, -0.04662011936, 0.6747748256]),
+        np.array([-1.547450662, -0.05359531567, 0.674774766]),
+        np.array([-1.536615372, 0.003250310896, 0.674774766]),
+        np.array([-1.51279664, 0.02789815143, 0.674774766]),
+        np.array([-1.550005555, -0.02500112727, 0.6747747064]),
+    ]
+    bowls_list = [
+        np.array([-0.4560598135, 0.6324006319, 0.8911616802]),
+    ]
+
+    # Populate feature variables
+    global targets  # A deque
+    global bowls    # A list
+    for target in sorted(targets_list, lambda t: t[1]):
+        targets.append(target)
+    for bowl in sorted(targets_list, lambda b: b[1]):
+        bowls.append(bowl)
+    return
 
 def dispatch(p, hasMutex: bool) -> None:
     """
@@ -77,11 +110,14 @@ def dispatch(p, hasMutex: bool) -> None:
     # Retrieve image from the camera
 
     # Identify objects in the image
+    global targets, bowls
 
     # If there are no objects remaining
     #   fault = True
     #   item = None
     #   bowl = None
+    if len(targets) == 0:
+        return None, None, True
 
     # else:
     #   Get a list of the x, y, z coordinates for the objects and bowls in the image
@@ -96,7 +132,12 @@ def dispatch(p, hasMutex: bool) -> None:
     #      item = [x, y, z] coordinates of the object
     #      bowl = [x, y, z] coordinates of the bowl   
 
-    return item, bowl, fault
+    # Get the closest target and bowl
+    is_psm1 = (p.name == "PSM1")  # For readability
+    item = targets.popleft() if is_psm1 else targets.pop()
+    bowl = bowls[0] if is_psm1 else bowls[-1]  # bowls[0] is closest to psm1; bowls[-1] to psm2
+
+    return item, bowl, False
 
 
 def mainloop(p) -> None: # p is the arm object
@@ -164,6 +205,13 @@ if __name__ == "__main__":
     mutex = threading.Lock()
     mutex2 = threading.Semaphore(1)
     
+    # Retrieve image of system from camera and extract features 
+    # Move this into its own thread later, if desired
+    # global targets, bowls 
+    image = capture_system()
+    extract_system_features(image)  # FUNCTION POPULATES GLOBAL VARIABLES
+                                    # Design pattern sucks but it will change if we need to thread this anyway.
+
     # Start both threads
     PSM1_Thread.start()
     PSM2_Thread.start()
