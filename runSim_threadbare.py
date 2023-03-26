@@ -8,6 +8,7 @@ import numpy as np
 import threading
 import dvrk
 import PyKDL
+import math
 from time import time
 from collections import deque
 from enum import Enum
@@ -41,23 +42,25 @@ def extract_system_features(image):
     ]
     return features
 
-def dispatch(p):
+def dispatch_item(p):
     """
     This function  interfaces with the computer vision part of the system and decides
     which object to try to pick up next based on which arm is asking, and whether it has
     the mutex.
     """
-    global items, bowls
-
+    global items
     if len(items) == 0:
-        return None, None, True
+        return None, True
+    # Get the closest target
+    item = tems.popleft() if (p.name == "PSM1") else items.pop()
+    return item, False
 
-    # Get the closest target and bowl
-    is_psm1 = (p.name == "PSM1")  # For readability
-    item = tems.popleft() if is_psm1 else items.pop()
+def dispatch_bowl(p):
+    global bowls
+    if len(bowls) == 0:
+        return None, True
     bowl = bowls[0] if is_psm1 else bowls[-1]  # bowls[0] is closest to psm1; bowls[-1] to psm2
-
-    return item, bowl, False
+    return bowl, False
 
 def traverseToLocation(p, location, z_offset):
     """
@@ -90,28 +93,27 @@ def initialize(armName):
     return 
 
 fake_waiter = {
-    "wait": (lambda: return), 
-    "is_busy": (lambda: return False)
+    "wait": (lambda: False), 
+    "is_busy": (lambda: False)
 }
-
 
 class PSMState:
     s = Enum("PSM States", [
         "Standby",
-        "Request",
+        "RequestItem",
         "MoveToItem", 
-        "Descending",
-        "Grabbing",
-        "Ascending",
+        "Descend",
+        "Grab",
+        "Ascend",
+        "RequestBowl",
         "MoveToBowl",
-        "Releasing",
+        "Release",
         "Home"
     ])
     
     def __init__(self):
         self.s = PSMState.s.Standby 
-        self.item = None
-        self.bowl = None
+        self.target = None
         self.waiter = fake_waiter
 
 class PSMPipeline:
@@ -120,12 +122,18 @@ class PSMPipeline:
         self.__waiter = fake_waiter
 
     def tick(self):
-        if not self.__waiter.is_busy()
+        if not self.__waiter.is_busy():
             self.__waiter = self.__actions.popleft()
 
     def is_busy(self):
         return (len(self.__actions) == 0) and (not self.__waiter.is_busy())
-    
+
+def collision_risk(target1, target2):
+    return all([
+        math.dist(target1[0:1], target2[0:1]) < 0.02,  # X-Y distance too close
+        target1[1] < target2[1] - 0.05  # Y boundary crossing
+    ])
+
 def mainloop(psm1, psm2):
     # State variables
     psm1_state, psm2_state = PSMState(), PSMState() 
@@ -133,55 +141,84 @@ def mainloop(psm1, psm2):
 
     start = time()
     while psm1_active or psm2_active:
-        psm1_active = tick(psm1, psm1_state)
-        psm2_active = tick(psm2, psm2_state)
+        if psm1_active:
+            if not collision_risk(psm1_state.target, psm2_state.target):
+                psm1_active = tick(psm1, psm1_state) 
+            else:
+                state.waiter = psm1.home()
+
+        if psm2_active:
+            if not collision_risk(psm1_state.target, psm2_state.target):
+                psm2_active = tick(psm2, psm2_state)
+            else:
+                state.waiter = psm2.home()
+
     return time() - start
 
 def tick(psm, state):
     if state.waiter.is_busy():
         return True
-    
+
     global Z_OFFSET
-    # State switch
+
+    #
+    # STATE MACHINE
+    #
     if state.s == PSMState.s.Standby:
-        state.target, state.bowl, fault = dispatch(psm)
+        state.s == PSMState.s.RequestItem
+
+    elif state.s == PSMState.s.RequestItem:
+        state.target, fault = dispatch_item(psm)
         if fault:
             # EXIT POINT: No more items to collect.
+            state.waiter = psm.home()
             return False
         else:
             state.s = PSMState.s.MoveToItem
     
     elif state.s == PSMState.s.MoveToItem:
-        state.waiter = traverseToLocation(psm, state.item, Z_OFFSET)
-        state.s = PSMState.s.Descending
+        state.waiter = traverseToLocation(psm, state.target, Z_OFFSET)
+        state.s = PSMState.s.Descend
     
-    elif state.s == PSMState.s.Descending:
+    elif state.s == PSMState.s.Descend:
         psm.jaw.open().wait()  # Absorb this time
         state.waiter = move_vertical(p, -Z_OFFSET)
-        state.s = PSMState.Grabbing
+        state.s = PSMState.Grab
     
-    elif state.s == PSMState.s.Grabbing:
+    elif state.s == PSMState.s.Grab:
         state.waiter = psm.jaw.close()
-        state.s = PSMState.s.Ascending
+        state.s = PSMState.s.Ascend
 
-    elif state.s == PSMState.s.Ascending:
+    elif state.s == PSMState.s.Ascend:
         state.waiter = move_vertical(p, Z_OFFSET)
-        state.s = PSMState.s.MoveToBowl
+        state.s = PSMState.s.RequestToBowl
+
+    elif state.s == PSMState.s.RequestBowl:
+        state.target, fault = dispatch_bowl(psm)
+        if fault:
+            print("ERROR! No bowl detected!")
+            psm.home()
+            # EXIT POINT: No bowl detected
+            return False
+        else:
+            state.s = PSMState.s.MoveToBowl
 
     elif state.s == PSMState.s.MoveToBowl:
-        state.waiter = traverseToLocation(psm, state.bowl, Z_OFFSET)
-        state.s = PSMState.s.Releasing
+        state.target, fault = dispatch_bowl
+        state.waiter = traverseToLocation(psm, state.target, Z_OFFSET)
+        state.s = PSMState.s.Release
 
-    elif state.s == PSMState.s.Releasing:
+    elif state.s == PSMState.s.Release:
         psm.jaw.open().wait()  # Absorb this time
         state.waiter = psm.jaw.close()
         state.s = PSMState.s.Home
 
     elif state.s == PSMState.s.Home:
         # state.waiter = psm.home()  # We don't necessarily want this! Let's just get a new target.
-        state.s = PSMState.s.Standby
+        state.s = PSMState.s.RequestItem
     
     return True
+
 
 if __name__ == "__main__":
     # Retrieve image of system from camera and extract features 
