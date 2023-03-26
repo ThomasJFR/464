@@ -89,6 +89,12 @@ def initialize(armName):
     p.home()
     return 
 
+fake_waiter = {
+    "wait": (lambda: return), 
+    "is_busy": (lambda: return False)
+}
+
+
 class PSMState:
     s = Enum("PSM States", [
         "Standby",
@@ -106,11 +112,20 @@ class PSMState:
         self.s = PSMState.s.Standby 
         self.item = None
         self.bowl = None
-        self.waiter = {
-            "wait": (lambda: return), 
-            "is_busy": (lambda: return False)
-        }
+        self.waiter = fake_waiter
 
+class PSMPipeline:
+    def __init__(self, actions):
+        self.__actions = deque(actions)
+        self.__waiter = fake_waiter
+
+    def tick(self):
+        if not self.__waiter.is_busy()
+            self.__waiter = self.__actions.popleft()
+
+    def is_busy(self):
+        return (len(self.__actions) == 0) and (not self.__waiter.is_busy())
+    
 def mainloop(psm1, psm2):
     # State variables
     psm1_state, psm2_state = PSMState(), PSMState() 
