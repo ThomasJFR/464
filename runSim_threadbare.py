@@ -28,6 +28,7 @@ def extract_system_features(image):
 
     # Dummy logic:
     features = dict()
+    psm1pos = np.array([-1.513, -0.0819994, 0.5655])
     features["items"] = [
         np.array([-1.527791262, 0.05018193647, 0.674774766]),
         np.array([-1.516814113, -0.04662011936, 0.6747748256]),
@@ -36,9 +37,9 @@ def extract_system_features(image):
         np.array([-1.51279664, 0.02789815143, 0.674774766]),
         np.array([-1.550005555, -0.02500112727, 0.6747747064]),
     ]
-    features["items"] = [x - np.array([-1.513,  -0.0819994,      0.5655]) for x in features["items"]]
+    features["items"] = [x - psm1pos for x in features["items"]]
     features["bowls"] = [
-        np.array([-0.4560598135, 0.6324006319, 0.8911616802]),
+        np.array([-0.4560598135, 0.6324006319, 0.8911616802]) - psm1pos,
     ]
     return features
 
