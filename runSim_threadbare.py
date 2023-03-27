@@ -92,10 +92,12 @@ def initialize(armName):
     p.home()
     return 
 
-fake_waiter = {
-    "wait": (lambda: False), 
-    "is_busy": (lambda: False)
-}
+class FakeWaiter:
+    def wait(self):
+        return 
+    
+    def is_busy(self): 
+        return
 
 class PSMState:
     s = Enum("PSM States", [
@@ -114,12 +116,12 @@ class PSMState:
     def __init__(self):
         self.s = PSMState.s.Standby 
         self.target = None
-        self.waiter = fake_waiter
+        self.waiter = FakeWaiter()
 
 class PSMPipeline:
     def __init__(self, actions):
         self.__actions = deque(actions)
-        self.__waiter = fake_waiter
+        self.__waiter = FakeWaiter()
 
     def tick(self):
         if not self.__waiter.is_busy():
