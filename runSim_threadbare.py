@@ -11,6 +11,7 @@ import PyKDL
 from time import time
 from collections import deque
 from enum import Enum
+from utils import FakeWaiter
 
 items = deque()
 bowls = list()
@@ -93,13 +94,6 @@ def initialize(armName):
     p.home()
     return p
 
-class FakeWaiter:
-    def wait(self):
-        return 
-    
-    def is_busy(self): 
-        return False
-
 class PSMState:
     s = Enum("PSM States", [
         "Standby",
@@ -167,7 +161,7 @@ def tick(psm, state):
         return state.s
 
     global Z_OFFSET
-
+    
     #
     # STATE MACHINE
     #
@@ -185,21 +179,35 @@ def tick(psm, state):
     
     elif state.s == PSMState.s.MoveToItem:
         state.waiter = traverseToLocation(psm, state.target, Z_OFFSET)
-        return PSMState.s.Descend
-    
-    elif state.s == PSMState.s.Descend:
-        psm.jaw.open().wait()  # Absorb this time
-        state.waiter = move_vertical(psm, -Z_OFFSET)
-        return PSMState.s.Grab
-    
+        #return PSMState.s.Descend
+        return state.s if state.waiter.is_busy() else PSMState.s.Grab
+
+        """
+        elif state.s == PSMState.s.Descend:
+            state.waiter = PSMSequence([
+                psm.jaw.open,
+                (move_vertical, (psm, -Z_OFFSET))
+            ])
+            return PSMState.s.Grab
+        """
     elif state.s == PSMState.s.Grab:
-        state.waiter = psm.jaw.close()
-        return PSMState.s.Ascend
+        state.waiter = PSMSequence([
+            psm.jaw.open,
+            (move_vertical, (psm, -Z_OFFSET)),
+            psm.jaw.close,
+            (move_vertical, (psm, +Z_OFFSET)),
+        ])
+        return state.s if state.waiter.is_busy() else PSMState.s.RequestBowl
 
-    elif state.s == PSMState.s.Ascend:
-        state.waiter = move_vertical(psm, Z_OFFSET)
-        return PSMState.s.RequestBowl
-
+        # LEGACY
+        #state.waiter = psm.jaw.close()
+        #return PSMState.s.Ascend
+        """
+        elif state.s == PSMState.s.Ascend:
+            state.waiter = move_vertical(psm, Z_OFFSET)
+            return PSMState.s.RequestBowl
+        """
+    
     elif state.s == PSMState.s.RequestBowl:
         state.target, fault = dispatch_bowl(psm)
         if fault:
@@ -212,11 +220,13 @@ def tick(psm, state):
 
     elif state.s == PSMState.s.MoveToBowl:
         state.waiter = traverseToLocation(psm, state.target, Z_OFFSET)
-        return PSMState.s.Release
+        return state.s if state.waiter.is_busy() else PSMState.s.Release
 
     elif state.s == PSMState.s.Release:
-        psm.jaw.open().wait()  # Absorb this time
-        state.waiter = psm.jaw.close()
+        state.waiter = PSMSequence([
+            psm.jaw.open,
+            psm.jaw.close
+        ])
         return PSMState.s.Home
 
     elif state.s == PSMState.s.Home:
