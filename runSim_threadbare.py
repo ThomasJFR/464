@@ -131,7 +131,7 @@ def collision_risk(state1, state2):
 
     conditions = [
         #target1[1] < target2[1],
-        dist(target1, target2, xy=True) < 0.01,
+        dist(target1, target2, xy=True) < 0.05,
         ("Move" in state1.s.name or "Move" in state2.s.name)
 
     ]
