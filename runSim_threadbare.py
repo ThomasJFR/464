@@ -11,7 +11,8 @@ import PyKDL
 from time import time
 from collections import deque
 from enum import Enum
-from utils import FakeWaiter
+from utils import FakeWaiter, PSMSequence, dist
+from threading import Lock
 
 items = deque()
 bowls = list()
@@ -45,7 +46,7 @@ def extract_system_features(image):
         features["items"][i][2] = 0.5655
     #features["items"] = [x -  psm1pos for x in features["items"]]
     features["bowls"] = [
-        np.array([-1.443, -0.0020, 0.5655]),
+       # np.array([-1.443, -0.0020, 0.5655]),
         np.array([-1.473, -0.0570, 0.5655]) #- psm1pos,
     ]
     return features
@@ -111,34 +112,32 @@ class PSMState:
         "RequestBowl",
         "MoveToBowl",
         "Release",
-        "Home"
+        "Home",
+        "Finished"
     ])
     
     def __init__(self):
         self.s = PSMState.s.Standby 
+        self.s_next = PSMState.s.Standby
         self.target = None
         self.waiter = FakeWaiter()
+        self.has_lock = False
 
-class PSMPipeline:
-    def __init__(self, actions):
-        self.__actions = deque(actions)
-        self.__waiter = FakeWaiter()
-
-    def tick(self):
-        if not self.__waiter.is_busy():
-            self.__waiter = self.__actions.popleft()
-
-    def is_busy(self):
-        return (len(self.__actions) == 0) and (not self.__waiter.is_busy())
-
-def collision_risk(target1, target2):
+def collision_risk(state1, state2):
+    target1 = state1.target
+    target2 = state2.target
     if target1 is None or target2 is None:
-        return False
+        return [False]
+
+    conditions = [
+        #target1[1] < target2[1],
+        dist(target1, target2, xy=True) < 0.01,
+        ("Move" in state1.s.name or "Move" in state2.s.name)
+
+    ]
+    #print(conditions)
+    return conditions
     
-    dist = lambda a, b: np.sqrt(np.dot(a-b).T, (a-b))
-    #print(target1[1], target2[1])
-    #print(target1[1], target2[1]-0.005)
-    #print(target1[1] < target2[1]-0.005)
     return all([
         #dist(target1[0:1], target2[0:1]) < 0.02,  # X-Y distance too close
         target1[1] > target2[1]  # Y boundary crossing
@@ -148,33 +147,43 @@ def mainloop(psm1, psm2):
     # State variables
     psm1_state, psm2_state = PSMState(), PSMState() 
     psm1_active, psm2_active = True,  True
-
     # TEMP
     start = time()
     lastprint = 0
     while psm1_active or psm2_active:
         now = time()
+        psm1_active = psm1_state.s is not PSMState.s.Finished
+        psm2_active = psm2_state.s is not PSMState.s.Finished
+
         if psm1_active:
-            if not collision_risk(psm1_state.target, psm2_state.target):
-                psm1_state.s = tick(psm1, psm1_state) 
+            will_collide = all(collision_risk(psm1_state, psm2_state)) 
+            psm1_state.has_lock = will_collide and not psm2_state.has_lock
+
+            if not will_collide or psm1_state.has_lock:
+                psm1_state.s = tick(psm1, psm1_state)
             else:
                 psm1_state.waiter = FakeWaiter()
         
         if psm2_active:
-            if not collision_risk(psm1_state.target, psm2_state.target):
+            will_collide = all(collision_risk(psm1_state, psm2_state)) 
+            psm2_state.has_lock = will_collide and not psm1_state.has_lock
+
+            if not will_collide or psm1_state.has_lock:
                 psm2_state.s = tick(psm2, psm2_state)
             else:
                 psm2_state.waiter = FakeWaiter()
-
+        
         if now // 1 > lastprint:
             print ("PSM1: %s\tPSM2: %s" % (psm1_state.s, psm2_state.s))
+            print (collision_risk(psm1_state, psm2_state))
+            print (psm1_state.has_lock, psm2_state.has_lock)
             lastprint = now // 1
     return time() - start
 
 def tick(psm, state):
     if state.waiter.is_busy():
         return state.s
-
+    print psm.name() + " tick!" 
     global Z_OFFSET
     #
     # STATE MACHINE
@@ -188,15 +197,18 @@ def tick(psm, state):
             # EXIT POINT: No more items to collect.
             state.waiter = FakeWaiter()
             psm.home()
-            return PSMState.s.Standby
+            return PSMState.s.Finished
         else:
-            print state.target
+            print psm.name() + " target: " + str(state.target)
             return PSMState.s.MoveToItem
     
     elif state.s == PSMState.s.MoveToItem:
+        print psm.name() + " dist to target:" + str(dist(psm.measured_cp().p, state.target, xy=True))
+        if dist(psm.measured_cp().p, state.target, xy=True) < 0.005:
+            return PSMState.s.Grab
+
         state.waiter = traverseToLocation(psm, state.target, Z_OFFSET)
-        #return PSMState.s.Descend
-        return state.s if state.waiter.is_busy() else PSMState.s.Grab
+        return state.s #if state.waiter.is_busy() else PSMState.s.Grab
 
         """
         elif state.s == PSMState.s.Descend:
@@ -207,13 +219,14 @@ def tick(psm, state):
             return PSMState.s.Grab
         """
     elif state.s == PSMState.s.Grab:
+        print(psm.name() + " GRABBING!")
         state.waiter = PSMSequence([
             psm.jaw.open,
             (move_vertical, (psm, -Z_OFFSET)),
             psm.jaw.close,
             (move_vertical, (psm, +Z_OFFSET)),
         ])
-        return state.s if state.waiter.is_busy() else PSMState.s.RequestBowl
+        return PSMState.s.RequestBowl
 
         # LEGACY
         #state.waiter = psm.jaw.close()
@@ -235,8 +248,11 @@ def tick(psm, state):
             return PSMState.s.MoveToBowl
 
     elif state.s == PSMState.s.MoveToBowl:
+        print dist(psm.measured_cp().p, state.target, xy=True)
+        if dist(psm.measured_cp().p, state.target, xy=True) <= 0.01:
+            return PSMState.s.Release
         state.waiter = traverseToLocation(psm, state.target, Z_OFFSET)
-        return state.s if state.waiter.is_busy() else PSMState.s.Release
+        return state.s
 
     elif state.s == PSMState.s.Release:
         state.waiter = PSMSequence([
@@ -266,6 +282,10 @@ if __name__ == "__main__":
     #from SafePSM import SafePSM1, SafePSM2
     psm1 = initialize("PSM1")#SafePSM1()
     psm2 = initialize("PSM2")#SafePSM2() 
+    delay = time()
+    print "Going home..."
+    while time() - delay < 5: # Let the progra settle
+        continue
     #print psm1.setpoint_cp()
     # Let the games begin!
     elapsed = mainloop(psm1, psm2)

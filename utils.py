@@ -18,11 +18,12 @@ class PSMSequence:
         else:
             actions = sequence
             args = [arg if isinstance(arg, Sequence) else (arg,) for arg in args]
-
+        self.__actions = deque()
+        self.__args = deque()
         self.__waiter = None 
         for action, arg in zip(actions, args):
-            self.__actions.append(action)
-            self.__args.append(arg)
+            self.__actions.appendleft(action)
+            self.__args.appendleft(arg)
 
     def tick(self):
         """
@@ -31,17 +32,18 @@ class PSMSequence:
         if self.__waiter and self.__waiter.is_busy():
             return False
         elif len(self.__actions) > 0:
-            action_fun = actions.pop()
+            action_fun = self.__actions.pop()
             args = self.__args.pop()
-            self.__waiter = action_fun(args) 
+            self.__waiter = action_fun(*args) 
         else:
             return True
 
-    def is_busy():
-        return not tick()
+    def is_busy(self):
+        self.tick()
+        return (self.__waiter.is_busy() or len(self.__actions) > 0)
 
     def wait(self):
-        while self.is_busy()
+        while self.is_busy():
             continue
 
 class FakeWaiter:
@@ -51,3 +53,14 @@ class FakeWaiter:
     def is_busy(self): 
         return False
 
+from PyKDL import Vector
+import numpy as np
+def dist(xyz1, xyz2, xy=False):
+    if isinstance(xyz1, np.ndarray):
+        xyz1 = Vector(*xyz1)
+    if isinstance(xyz2, np.ndarray):
+        xyz2 = Vector(*xyz2)
+    if xy:
+        xyz1.z(0)
+        xyz2.z(0)
+    return (xyz1 - xyz2).Norm()
