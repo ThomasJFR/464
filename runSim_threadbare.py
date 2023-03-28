@@ -29,8 +29,10 @@ def extract_system_features(image):
 
     # Dummy logic:
     features = dict()
-    psm1pos = np.array([-1.513, -0.0819994, 0.5655])
+    #psm1pos = np.array([-1.513,  -0.0819994, 05]) 
     features["items"] = [
+       # np.array([ -1.523,  -0.0469994,      0.5655])
+    #]
         np.array([-1.527791262, 0.05018193647, 0.674774766]),
         np.array([-1.516814113, -0.04662011936, 0.6747748256]),
         np.array([-1.547450662, -0.05359531567, 0.674774766]),
@@ -38,9 +40,13 @@ def extract_system_features(image):
         np.array([-1.51279664, 0.02789815143, 0.674774766]),
         np.array([-1.550005555, -0.02500112727, 0.6747747064]),
     ]
-    features["items"] = [x - psm1pos for x in features["items"]]
+
+    for i in range(len(features["items"])):
+        features["items"][i][2] = 0.5655
+    #features["items"] = [x -  psm1pos for x in features["items"]]
     features["bowls"] = [
-        np.array([-0.4560598135, 0.6324006319, 0.8911616802]) - psm1pos,
+        np.array([-1.443, -0.0020, 0.5655]),
+        np.array([-1.473, -0.0570, 0.5655]) #- psm1pos,
     ]
     return features
 
@@ -54,14 +60,14 @@ def dispatch_item(p):
     if len(items) == 0:
         return None, True
     # Get the closest target
-    item = tems.popleft() if (p.name == "PSM1") else items.pop()
+    item = items.popleft() if (p.name() == "PSM1") else items.pop()
     return item, False
 
 def dispatch_bowl(p):
     global bowls
     if len(bowls) == 0:
         return None, True
-    bowl = bowls[0] if (p.name == "PSM1") else bowls[-1]  # bowls[0] is closest to psm1; bowls[-1] to psm2
+    bowl = bowls[0] if (p.name() == "PSM1") else bowls[-1]  # bowls[0] is closest to psm1; bowls[-1] to psm2
     return bowl, False
 
 def traverseToLocation(p, location, z_offset):
@@ -126,34 +132,43 @@ class PSMPipeline:
         return (len(self.__actions) == 0) and (not self.__waiter.is_busy())
 
 def collision_risk(target1, target2):
+    if target1 is None or target2 is None:
+        return False
+    
     dist = lambda a, b: np.sqrt(np.dot(a-b).T, (a-b))
+    #print(target1[1], target2[1])
+    #print(target1[1], target2[1]-0.005)
+    #print(target1[1] < target2[1]-0.005)
     return all([
         #dist(target1[0:1], target2[0:1]) < 0.02,  # X-Y distance too close
-        target1[1] < target2[1] - 0.05  # Y boundary crossing
+        target1[1] > target2[1]  # Y boundary crossing
     ])
 
 def mainloop(psm1, psm2):
     # State variables
     psm1_state, psm2_state = PSMState(), PSMState() 
-    psm1_active, psm2_active = True, True
+    psm1_active, psm2_active = True,  True
 
     # TEMP
-    psm2_state.target = np.array([-10, -10, -10])
     start = time()
+    lastprint = 0
     while psm1_active or psm2_active:
+        now = time()
         if psm1_active:
-            if psm1_state.target is None or not collision_risk(psm1_state.target, psm2_state.target):
+            if not collision_risk(psm1_state.target, psm2_state.target):
                 psm1_state.s = tick(psm1, psm1_state) 
             else:
                 psm1_state.waiter = FakeWaiter()
-        print ("PSM1: %s\tPSM2: %s" % (psm1_state.s, psm2_state.s))
-        continue
+        
         if psm2_active:
-            if psm2_state.target is None or not collision_risk(psm1_state.target, psm2_state.target):
+            if not collision_risk(psm1_state.target, psm2_state.target):
                 psm2_state.s = tick(psm2, psm2_state)
             else:
                 psm2_state.waiter = FakeWaiter()
 
+        if now // 1 > lastprint:
+            print ("PSM1: %s\tPSM2: %s" % (psm1_state.s, psm2_state.s))
+            lastprint = now // 1
     return time() - start
 
 def tick(psm, state):
@@ -161,7 +176,6 @@ def tick(psm, state):
         return state.s
 
     global Z_OFFSET
-    
     #
     # STATE MACHINE
     #
@@ -172,9 +186,11 @@ def tick(psm, state):
         state.target, fault = dispatch_item(psm)
         if fault:
             # EXIT POINT: No more items to collect.
-            state.waiter = psm.home()
+            state.waiter = FakeWaiter()
+            psm.home()
             return PSMState.s.Standby
         else:
+            print state.target
             return PSMState.s.MoveToItem
     
     elif state.s == PSMState.s.MoveToItem:
@@ -249,8 +265,8 @@ if __name__ == "__main__":
     # Start arms. These functions hang the thread.
     #from SafePSM import SafePSM1, SafePSM2
     psm1 = initialize("PSM1")#SafePSM1()
-    psm2 = initialize("PSM1")#SafePSM2() 
-    print psm1.setpoint_cp()
+    psm2 = initialize("PSM2")#SafePSM2() 
+    #print psm1.setpoint_cp()
     # Let the games begin!
     elapsed = mainloop(psm1, psm2)
     print("Task finished. Elpsed time: %ds" % elapsed)
