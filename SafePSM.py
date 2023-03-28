@@ -134,72 +134,7 @@ class SafePSM(psm):
 # Helpers to make the acquisiton process quicker
 def SafePSM1(): return SafePSM("PSM1")
 def SafePSM2(): return SafePSM("PSM2")
-
-class PSMController:
-    """
-    Controls PSM1 and PSM2 by restricting the movement of each.
-    """
-
-    def __init__(self, psm1, psm2):
-        self._psm1 = psm1
-        self._psm2 = psm2
-        
-        self._yzone = []  # Specifies the y domain for the entire system
-        self._bpy = 0  # The y-position of the XZ bounding plane
-        self._bpyb = 0.05 # The XZ bounding plane buffer [m]
-        self._bpz = 0
-        self._bpzb = 0.05
-        
-        self._bp_access = self._psm1
-
-    def init(self, yzone=[]):
-        if yzone:  # Specify the zone manually
-            self._yzone = yzone
-            return
-        
-        # Acquire the zone from the current position of the PSMs
-        self._yzone = [
-            self._psm1.measured_cp().p[1],
-            self._psm2.measured_cp().p[1],
-        ]
-
-    def update(self, bpy=None):
-        """
-        Automatically updates the boundaries for each of the PSMs
-        """
-        if bpy is not None:
-            self._bpy = bpy
-
-        # Update boundaries for each PSM object
-        self._psm1.set_safezone(ybounds=[
-            self._yzone[0], 
-            self._bpy - (0 if self._bp_access is self._psm1 else self._bpyb])
-        self._psm2.set_safezone(ybounds=[
-            self._bpy + (0 if self._bp_access is self._psm1 else self._bpyb]),
-            self._yzone[1]])
-
-        # Move the arms if they are now out-of-bounds
-        #wait1 = self._psm1.safe_move_pos().wait()
-        #wait2 = self._psm2.safe_move_pos().wait()
-        
-
-class PSMBoundary:
-    # OUTDATED
-    def __init__(self, PSM1, PSM2):
-        self._PSM1 = PSM1
-        self._PSM2 = PSM2
-        self._bound_plane = 0  # y coordinate
-
-    def set_bounding_plane(self, y):
-        if y > 0.08:
-            print("Outside of dextrous workspace!")
-
-        self._bound_plane = y
-        self._PSM1.ybound[1] = y
-        self._PSM2.ybound[1] = y
-
-    def get_bound(self, dim=None):
-        return bound_plane
+def SafePSM3(): return SafePSM("PSM3")       
 
 class FailWaiter:
     def wait(self):
