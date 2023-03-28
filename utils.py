@@ -35,12 +35,13 @@ class PSMSequence:
             action_fun = self.__actions.pop()
             args = self.__args.pop()
             self.__waiter = action_fun(*args) 
+            print "NEXT ACTION!"
         else:
             return True
 
     def is_busy(self):
-        self.tick()
-        return (self.__waiter.is_busy() or len(self.__actions) > 0)
+        #self.tick()
+        return not self.tick()#(self.__waiter.is_busy() or len(self.__actions) > 0)
 
     def wait(self):
         while self.is_busy():

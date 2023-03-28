@@ -168,7 +168,7 @@ def mainloop(psm1, psm2):
             will_collide = all(collision_risk(psm1_state, psm2_state)) 
             psm2_state.has_lock = will_collide and not psm1_state.has_lock
 
-            if not will_collide or psm1_state.has_lock:
+            if not will_collide or psm2_state.has_lock:
                 psm2_state.s = tick(psm2, psm2_state)
             else:
                 psm2_state.waiter = FakeWaiter()
@@ -183,7 +183,6 @@ def mainloop(psm1, psm2):
 def tick(psm, state):
     if state.waiter.is_busy():
         return state.s
-    print psm.name() + " tick!" 
     global Z_OFFSET
     #
     # STATE MACHINE
@@ -196,7 +195,7 @@ def tick(psm, state):
         if fault:
             # EXIT POINT: No more items to collect.
             state.waiter = FakeWaiter()
-            psm.home()
+            psm.move_jp(np.zeros(6))
             return PSMState.s.Finished
         else:
             print psm.name() + " target: " + str(state.target)
@@ -280,11 +279,14 @@ if __name__ == "__main__":
 
     # Start arms. These functions hang the thread.
     #from SafePSM import SafePSM1, SafePSM2
+    print "Going home..."
     psm1 = initialize("PSM1")#SafePSM1()
+    delay = time()
+    while time() - delay < 2.5: # Let the progra settle
+        continue
     psm2 = initialize("PSM2")#SafePSM2() 
     delay = time()
-    print "Going home..."
-    while time() - delay < 5: # Let the progra settle
+    while time() - delay < 2.5: # Let the progra settle
         continue
     #print psm1.setpoint_cp()
     # Let the games begin!
