@@ -243,7 +243,7 @@ def tick(psm, state):
 
     elif state.s == PSMState.s.ApproachBowl:
         approach_target = state.target
-        approach_target[2] += 0.05 *(-1 if psm.name() == "PSM1" else 1)
+        approach_target[1] += 0.05 *(-1 if psm.name() == "PSM1" else 1)
         
         if dist(psm.measured_cp().p, approach_target, xy=True) <= 0.01:
             return PSMState.s.MoveToBowl
