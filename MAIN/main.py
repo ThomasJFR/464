@@ -11,8 +11,8 @@ import PyKDL
 from time import time
 from collections import deque
 from enum import Enum
+from moves import 
 from utils import FakeWaiter, PSMSequence, dist
-from threading import Lock
 
 items = deque()
 bowls = list()
@@ -70,22 +70,6 @@ def dispatch_bowl(p):
         return None, True
     bowl = bowls[0] if (p.name() == "PSM1") else bowls[-1]  # bowls[0] is closest to psm1; bowls[-1] to psm2
     return bowl, False
-
-def traverseToLocation(p, location, z_offset):
-    """
-    Function that moves the gripper from one position to another based on 
-    cartesian commands.
-    """
-    goal = p.setpoint_cp()
-    goal.p[0] = location[0] # Set x position
-    goal.p[1] = location[1] # Set y position
-    goal.p[2] = location[2] + z_offset # Set z position
-    return p.move_cp(goal)
-
-def move_vertical(p, z):
-    goal = p.setpoint_cp()
-    goal.p[2] += z
-    return p.move_cp(goal)
 
 
 def initialize(armName):
@@ -266,6 +250,17 @@ def tick(psm, state):
 
 
 if __name__ == "__main__":
+    home_ecm()
+    dvrk.ecm
+    psm1 = initialize("PSM1")#SafePSM1()
+    delay = time()
+    while time() - delay < 2.5: # Let the progra settle
+        continue
+    psm2 = initialize("PSM2")#SafePSM2() 
+    delay = time()
+    while time() - delay < 2.5: # Let the progra settle
+        continue
+    
     # Retrieve image of system from camera and extract features 
     # Move this into its own thread later, if desired
     image = capture_system()
@@ -280,14 +275,6 @@ if __name__ == "__main__":
     # Start arms. These functions hang the thread.
     #from SafePSM import SafePSM1, SafePSM2
     print "Going home..."
-    psm1 = initialize("PSM1")#SafePSM1()
-    delay = time()
-    while time() - delay < 2.5: # Let the progra settle
-        continue
-    psm2 = initialize("PSM2")#SafePSM2() 
-    delay = time()
-    while time() - delay < 2.5: # Let the progra settle
-        continue
     #print psm1.setpoint_cp()
     # Let the games begin!
     elapsed = mainloop(psm1, psm2)
