@@ -78,7 +78,7 @@ def dispatch_bowl(p):
     return bowl, False
 
 
-def initialize(arm_name):
+def initializePSM(armName):
     """
     This is a function to initialize and home each arm, and to send each arm to the 
     mainloop once initialized.
@@ -90,6 +90,19 @@ def initialize(arm_name):
     p.enable()
     p.home()
     return p
+
+def initializeECM(armName):
+    """
+    This is a function to initialize and home each arm, and to send each arm to the 
+    mainloop once initialized.
+    """
+    # Initialize arm
+    e = dvrk.psm(armName)
+
+    # Home the arm
+    e.enable()
+    e.home()
+    return 
 
 class PSMState:
     s = Enum("PSM States", [
@@ -274,6 +287,9 @@ if __name__ == "__main__":
     #parser.add_argument("-v", "--verbose", action="store_true", help="Increase verbosity")
     parser.add_argument("-c", "--calibrate", action="store_true", help="Allows user to calibrate the arm before beginning pick-and-place")
     args = parser.parse_args()
+
+    e = initializeECM("ECM")
+    home_ecm(e)
 
     # SR: Initialize the arms
     #home_ecm().wait()
