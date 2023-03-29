@@ -9,20 +9,31 @@ import cv2
 
 # Instantiate CvBridge
 bridge = CvBridge()
+imageCounter = 0
 
 def main():
+    global imageCounter
     rospy.init_node('image_listener')
-
     platform = raw_input("coppelia OR dvrk: ")
     cameraChoice = raw_input("left OR right: ")
-
+    
     # define image topic
     image_topic = imageTopic(platform,cameraChoice)
-    
-    # setup subscriber, define callback to save image
-    sub = rospy.Subscriber(image_topic, Image, saveImage)
-    rospy.sleep(0.1) # pause script to save image
-    sub.unregister() # unsubscribe
+
+    print("Total images captured: "+ str(imageCounter))    
+    continueCapture = raw_input("Continue taking images? y/n: ")
+
+    # loop until user completes calibration
+    while continueCapture == "Y" or continueCapture == "y":
+        imageCounter+=1
+
+        # setup subscriber, define callback to save image
+        sub = rospy.Subscriber(image_topic, Image, saveImage)
+        rospy.sleep(0.1) # pause script to save image
+        sub.unregister() # unsubscribe
+        print("Total images captured: "+ str(imageCounter))
+
+        continueCapture = raw_input("Continue taking images? y/n: ")
 
 def imageTopic(platform,cameraChoice):
     image_topic = "N/A"
@@ -49,6 +60,7 @@ def imageTopic(platform,cameraChoice):
     return image_topic
 
 def saveImage(msg):
+    global imageCounter
     print("Received an image")
     try:        
         cv2_img = bridge.imgmsg_to_cv2(msg, "bgr8") # Convert ROS Image message to OpenCV2
@@ -57,7 +69,7 @@ def saveImage(msg):
     except CvBridgeError, e:
         print(e)
     else:
-        cv2.imwrite('cameraImage.png', cv2_img) # save image
+        cv2.imwrite("CameraCalibration/cameraCal"+str(imageCounter)+".png", cv2_img) # save image
         print("Image saved!")
 
 if __name__ == '__main__':
