@@ -1,5 +1,13 @@
 def home_ecm(e):
-    pass
+    # Test file for ECM home script	
+	goal = e.measured_jp()
+	goal[1] = -0.54
+	goal[2] = 0.0
+	
+	return e.move_jp(goal)
+
+
+print("ECM is homed.")
 
 def traverse_to_location(p, location, z_offset):
     """

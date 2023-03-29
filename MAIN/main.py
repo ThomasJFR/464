@@ -11,7 +11,7 @@ import PyKDL
 from time import time
 from collections import deque
 from enum import Enum
-from moves import 
+from moves import home_ecm
 from utils import FakeWaiter, PSMSequence, dist
 
 items = deque()
@@ -72,7 +72,7 @@ def dispatch_bowl(p):
     return bowl, False
 
 
-def initialize(armName):
+def initializePSM(armName):
     """
     This is a function to initialize and home each arm, and to send each arm to the 
     mainloop once initialized.
@@ -84,6 +84,19 @@ def initialize(armName):
     p.enable()
     p.home()
     return p
+
+def initializeECM(armName):
+    """
+    This is a function to initialize and home each arm, and to send each arm to the 
+    mainloop once initialized.
+    """
+    # Initialize arm
+    e = dvrk.psm(armName)
+
+    # Home the arm
+    e.enable()
+    e.home()
+    return 
 
 class PSMState:
     s = Enum("PSM States", [
@@ -250,13 +263,14 @@ def tick(psm, state):
 
 
 if __name__ == "__main__":
-    home_ecm()
-    dvrk.ecm
-    psm1 = initialize("PSM1")#SafePSM1()
+    e = initializeECM("ECM")
+    home_ecm(e)
+
+    psm1 = initializePSM("PSM1")#SafePSM1()
     delay = time()
     while time() - delay < 2.5: # Let the progra settle
         continue
-    psm2 = initialize("PSM2")#SafePSM2() 
+    psm2 = initializePSM("PSM2")#SafePSM2() 
     delay = time()
     while time() - delay < 2.5: # Let the progra settle
         continue
