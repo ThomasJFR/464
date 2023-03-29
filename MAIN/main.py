@@ -247,6 +247,7 @@ def tick(psm, state):
         
         if dist(psm.measured_cp().p, approach_target, xy=True) <= 0.01:
             return PSMState.s.MoveToBowl
+
         state.waiter = traverse_to_location(psm, approach_target, Z_OFFSET)
         return state.s
 
