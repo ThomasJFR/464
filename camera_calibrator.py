@@ -3,6 +3,15 @@ import cv2 as cv
 import glob
 import os
 
+def resize(img, scale_percent):
+    print('Original Dimensions : ',img.shape)
+    width = int(img.shape[1] * scale_percent / 100)
+    height = int(img.shape[0] * scale_percent / 100)
+    dim = (width, height)
+    img = cv.resize(img, dim, interpolation = cv.INTER_AREA)
+    print('Resized Dimensions : ',img.shape)
+    return img
+
 # termination criteria
 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
@@ -14,26 +23,19 @@ objp[:,:2] = np.mgrid[0:5,0:8].T.reshape(-1,2)
 objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
 
-# resize images
-
 images = glob.glob(os.path.join("./calibration photos", "*.jpg"))
+scale_percent = 20
 
 for fname in images:
     img = cv.imread(fname)
 
     # resize images
-    print('Original Dimensions : ',img.shape)
-    scale_percent = 20 # percent of original size
-    width = int(img.shape[1] * scale_percent / 100)
-    height = int(img.shape[0] * scale_percent / 100)
-    dim = (width, height)
-    img = cv.resize(img, dim, interpolation = cv.INTER_AREA)
-    print('Resized Dimensions : ',img.shape)
+    img = resize(img,scale_percent)
 
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
     cv.imshow('gray',gray)
-    cv.waitKey(5000)
+    cv.waitKey(1000)
 
     # Find the (interior) chess board corners
     ret, corners = cv.findChessboardCorners(gray, (5,8), None)
@@ -55,6 +57,8 @@ cv.destroyAllWindows()
 ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 
 # Undistortion
+img = cv.imread('./calibration photos/20230327_230528.jpg')
+img = resize(img,scale_percent)
 h,  w = img.shape[:2]
 newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
 
@@ -62,4 +66,13 @@ dst = cv.undistort(img, mtx, dist, None, newcameramtx)
 # crop the image
 x, y, w, h = roi
 dst = dst[y:y+h, x:x+w]
-cv.imwrite('calibresult.png', dst)
+cv.imwrite('./calibration photos/calibresult.png', dst)
+
+# Reprojection Error Calculation
+# 0 is best
+mean_error = 0
+for i in range(len(objpoints)):
+    imgpoints2, _ = cv.projectPoints(objpoints[i], rvecs[i], tvecs[i], mtx, dist)
+    error = cv.norm(imgpoints[i], imgpoints2, cv.NORM_L2)/len(imgpoints2)
+    mean_error += error
+print( "total error: {}".format(mean_error/len(objpoints)) )
