@@ -35,7 +35,6 @@ class PSMSequence:
             action_fun = self.__actions.pop()
             args = self.__args.pop()
             self.__waiter = action_fun(*args) 
-            print "NEXT ACTION!"
         else:
             return True
 

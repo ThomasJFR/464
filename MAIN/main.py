@@ -7,7 +7,6 @@
 # Python builtins
 from time import time, sleep
 from collections import deque
-from enum import Enum
 
 # Externals
 import dvrk
@@ -19,43 +18,13 @@ import numpy as np
 from calibration import calibrate_z
 from moves import traverse_to_location, move_vertical, home_ecm
 from utils import FakeWaiter, PSMSequence, dist
+from vision import capture_system, extract_system_features
+from collision import collision_risk
+from psm_state_machine import PSMState
 
 items = deque()
 bowls = list()
 Z_OFFSET = 0.05
-
-def capture_system():
-    "Function that gets a photo of the system that we can extract features from"
-    pass
-
-def extract_system_features(image):
-    """
-    Extract targets and bowls from an image
-    """
-    # Process image to identify positions of targets and bowls
-
-    # Dummy logic:
-    features = dict()
-    #psm1pos = np.array([-1.513,  -0.0819994, 05]) 
-    features["items"] = [
-       # np.array([ -1.523,  -0.0469994,      0.5655])
-    #]
-        np.array([-1.527791262, 0.05018193647, 0.674774766]),
-        np.array([-1.516814113, -0.04662011936, 0.6747748256]),
-        np.array([-1.547450662, -0.05359531567, 0.674774766]),
-        np.array([-1.536615372, 0.003250310896, 0.674774766]),
-        np.array([-1.51279664, 0.02789815143, 0.674774766]),
-        np.array([-1.550005555, -0.02500112727, 0.6747747064]),
-    ]
-
-    for i in range(len(features["items"])):
-        features["items"][i][2] = 0.5655
-    #features["items"] = [x -  psm1pos for x in features["items"]]
-    features["bowls"] = [
-       # np.array([-1.443, -0.0020, 0.5655]),
-        np.array([-1.473, -0.0570, 0.5655]) #- psm1pos,
-    ]
-    return features
 
 def dispatch_item(p):
     """
@@ -78,7 +47,7 @@ def dispatch_bowl(p):
     return bowl, False
 
 
-def initializePSM(armName):
+def initializePSM(arm_name):
     """
     This is a function to initialize and home each arm, and to send each arm to the 
     mainloop once initialized.
@@ -89,70 +58,26 @@ def initializePSM(armName):
     # Home the arm
     p.enable()
     p.home()
+    sleep(2)  # Necessary for simulator
     return p
 
-def initializeECM(armName):
+def initializeECM(arm_name):
     """
     This is a function to initialize and home each arm, and to send each arm to the 
     mainloop once initialized.
     """
     # Initialize arm
-    e = dvrk.psm(armName)
+    e = dvrk.ecm(arm_name)
 
     # Home the arm
     e.enable()
     e.home()
-    return 
+    sleep(2)
+    return e 
 
-class PSMState:
-    s = Enum("PSM States", [
-        "Standby",
-        "RequestItem",
-        "MoveToItem", 
-        "Descend",
-        "Grab",
-        "Ascend",
-        "RequestBowl",
-        "ApproachBowl",
-        "MoveToBowl",
-        "Release",
-        "Home",
-        "Finished"
-    ])
-    
-    def __init__(self):
-        self.s = PSMState.s.Standby 
-        self.s_next = PSMState.s.Standby
-        self.target = None
-        self.waiter = FakeWaiter()
-        self.has_lock = False
-
-def collision_risk(psm1, state1, psm2, state2, as_list=False):
-    # Extract positions and targets
-    pos1, tgt1 = psm1.measured_cp().p, state1.target
-    pos2, tgt2 = psm2.measured_cp().p, state2.target
-    #target1 = state1.target
-    #target2 = state2.target
-    if tgt1 is None or tgt2 is None:
-        return [False] if as_list else False
-
-    nearby = lambda p1, p2: dist(p1, p2, xy=True) < 0.03
-    conditions = [
-        any([
-            #target1[1] < target2[1],
-            nearby(tgt1, tgt2),
-            nearby(pos1, tgt2),
-            nearby(pos2, tgt1),
-        ]),
-        any([
-            "Move" in state1.s.name,
-            "Move" in state2.s.name
-        ])
-    ]
-    return conditions if as_list else all(conditions)
-
-def mainloop(psm1, psm2):
+def mainloop(args):
     # State variables
+    psm1, psm2 = args["PSM1"], args["PSM2"]
     psm1_state, psm2_state = PSMState(), PSMState() 
     psm1_active, psm2_active = True,  True
 
@@ -187,11 +112,11 @@ def mainloop(psm1, psm2):
             #print (psm1_state.has_lock, psm2_state.has_lock)
             lastprint = now // 1
     return time() - start
-
 def tick(psm, state):
     if state.waiter.is_busy():
         return state.s
     global Z_OFFSET
+
     #
     # STATE MACHINE
     #
@@ -217,14 +142,6 @@ def tick(psm, state):
         state.waiter = traverse_to_location(psm, state.target, Z_OFFSET)
         return state.s #if state.waiter.is_busy() else PSMState.s.Grab
 
-        """
-        elif state.s == PSMState.s.Descend:
-            state.waiter = PSMSequence([
-                psm.jaw.open,
-                (move_vertical, (psm, -Z_OFFSET))
-            ])
-            return PSMState.s.Grab
-        """
     elif state.s == PSMState.s.Grab:
         #print(psm.name() + " GRABBING!")
         state.waiter = PSMSequence([
@@ -235,15 +152,6 @@ def tick(psm, state):
         ])
         return PSMState.s.RequestBowl
 
-        # LEGACY
-        #state.waiter = psm.jaw.close()
-        #return PSMState.s.Ascend
-        """
-        elif state.s == PSMState.s.Ascend:
-            state.waiter = move_vertical(psm, Z_OFFSET)
-            return PSMState.s.RequestBowl
-        """
-    
     elif state.s == PSMState.s.RequestBowl:
         state.target, fault = dispatch_bowl(psm)
         if fault:
@@ -251,11 +159,14 @@ def tick(psm, state):
             psm.home()
             # EXIT POINT: No bowl detected
             return PSMState.s.Standby
+        
+        if psm.name() == "PSM1":
+            return PSMState.s.MoveToBowl
         else:
             return PSMState.s.ApproachBowl
 
     elif state.s == PSMState.s.ApproachBowl:
-        approach_target = state.target
+        approach_target = np.array([x for x in state.target])
         approach_target[1] += 0.05 *(-1 if psm.name() == "PSM1" else 1)
         
         if dist(psm.measured_cp().p, approach_target, xy=True) <= 0.01:
@@ -269,13 +180,28 @@ def tick(psm, state):
             return PSMState.s.Release
         state.waiter = traverse_to_location(psm, state.target, Z_OFFSET)
         return state.s
-
+   
     elif state.s == PSMState.s.Release:
         state.waiter = PSMSequence([
             psm.jaw.open,
             psm.jaw.close
         ])
-        return PSMState.s.Home
+        # In coppeliasim, PSM1 crashes if we go to the blue bowl.
+        # TODO Fix this later
+        if psm.name() == "PSM1":
+            return PSMState.s.Home
+        else:
+            return PSMState.s.BackOffBowl
+ 
+    elif state.s == PSMState.s.BackOffBowl:
+        approach_target = np.array([x for x in state.target])
+        approach_target[1] += 0.05 *(-1 if psm.name() == "PSM1" else 1)
+        
+        if dist(psm.measured_cp().p, approach_target, xy=True) <= 0.01:
+            return PSMState.s.Home
+
+        state.waiter = traverse_to_location(psm, approach_target, Z_OFFSET)
+        return state.s
 
     elif state.s == PSMState.s.Home:
         # state.waiter = psm.home()  # We don't necessarily want this! Let's just get a new target.
@@ -289,20 +215,23 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     e = initializeECM("ECM")
-    home_ecm(e)
-
+    sleep(2)
     # SR: Initialize the arms
     #home_ecm().wait()
     print("PSM1 homing...")
-    psm1 = initialize("PSM1")
-    sleep(2.5)
+    psm1 = initializePSM("PSM1")
     print("PSM2 homing...")
-    psm2 = initialize("PSM2")
-    sleep(2.5)
+    psm2 = initializePSM("PSM2")
 
+    print("Homing ECM")
+    home_ecm(e).wait()
+    
     # SR: Calibrate the z of the table, if requested
     if args.calibrate:
-        calibrate_z(psm1)  # Hangs the thread
+        print("------------------------------------------")
+        print("-  TOUCH PSM1 TIP TO TABLE TO CALIBRATE  -")
+        print("------------------------------------------")
+        z_calibrated = calibrate_z(psm1)  # Hangs the thread
 
     # SR: Move the arms out of the way
     #psm1.safe_home().wait()
@@ -314,13 +243,19 @@ if __name__ == "__main__":
     # SR: Generate features
     # Sort the items and bowls by their positions such that
     # items closer to psm1 appear on the left side of the list.
+    # TODO Fix the bad global pattern
     sort_by_y = lambda xyz: xyz[1]
     items = deque(sorted(features["items"], key=sort_by_y))
     bowls = list(sorted(features["bowls"], key=sort_by_y))
-
-    #print psm1.setpoint_cp()
+    if args.calibrate:
+        for i in range(len(items)):
+            items[i][2] = z_calibrated 
+        for i in range(len(bowls)):
+            bowls[i][2] = z_calibrated 
     # Let the games begin!
-
-    elapsed = mainloop(psm1, psm2)
+    elapsed = mainloop({
+        "PSM1": psm1,
+        "PSM2": psm2,
+    })
     print("Task finished. Elpsed time: %ds" % elapsed)
 
