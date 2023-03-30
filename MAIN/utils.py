@@ -64,3 +64,11 @@ def dist(xyz1, xyz2, xy=False):
         xyz1.z(0)
         xyz2.z(0)
     return (xyz1 - xyz2).Norm()
+
+def dist_from_line(P, lineP1, lineP2):
+    # See: https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Line_defined_by_two_points
+    x0, x1, x2 = P.x(), lineP1.x(), lineP2.x() 
+    y0, y1, y2 = P.x(), lineP1.y(), lineP2.y()
+    numerator = abs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1))
+    denominator = ((x2 - x1)**2 + (y2 - y1)**2)**0.5
+    return numerator/denominator
