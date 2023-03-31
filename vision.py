@@ -60,8 +60,8 @@ def saveImage(msg):
     print("Received an image")
     try:        
         cv2_img = bridge.imgmsg_to_cv2(msg, "bgr8") # Convert ROS Image message to OpenCV2
-        cv2_img = cv2.rotate(cv2_img,cv2.ROTATE_180) # rotate image by 180 since it's upside-down
-        cv2_img = cv2.flip(cv2_img,1) # flip image horizontally
+        # cv2_img = cv2.rotate(cv2_img,cv2.ROTATE_180) # rotate image by 180 since it's upside-down
+        # cv2_img = cv2.flip(cv2_img,1) # flip image horizontally
     except CvBridgeError, e:
         print(e)
     else:
