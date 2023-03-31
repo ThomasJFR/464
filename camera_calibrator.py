@@ -16,15 +16,15 @@ def resize(img, scale_percent):
 criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
 # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
-objp = np.zeros((5*8,3), np.float32)
-objp[:,:2] = np.mgrid[0:5,0:8].T.reshape(-1,2)
+objp = np.zeros((6*7,3), np.float32)
+objp[:,:2] = np.mgrid[0:6,0:7].T.reshape(-1,2)
 
 # Arrays to store object points and image points from all the images.
 objpoints = [] # 3d point in real world space
 imgpoints = [] # 2d points in image plane.
 
-images = glob.glob(os.path.join("./calibration photos", "*.jpg"))
-scale_percent = 20
+images = glob.glob(os.path.join("./CameraCalibration", "*.png"))
+scale_percent = 100
 
 for fname in images:
     img = cv.imread(fname)
@@ -38,8 +38,8 @@ for fname in images:
     cv.waitKey(1000)
 
     # Find the (interior) chess board corners
-    ret, corners = cv.findChessboardCorners(gray, (5,8), None)
-
+    ret, corners = cv.findChessboardCorners(gray, (9,4), None)
+    print(ret)
     # If found, add object points, image points (after refining them)
     if ret == True:
         objpoints.append(objp)
@@ -57,7 +57,7 @@ cv.destroyAllWindows()
 ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 
 # Undistortion
-img = cv.imread('./calibration photos/20230327_230528.jpg')
+img = cv.imread('./CameraCalibration/cameraCal1.png')
 img = resize(img,scale_percent)
 h,  w = img.shape[:2]
 newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
@@ -66,7 +66,7 @@ dst = cv.undistort(img, mtx, dist, None, newcameramtx)
 # crop the image
 x, y, w, h = roi
 dst = dst[y:y+h, x:x+w]
-cv.imwrite('./calibration photos/calibresult.png', dst)
+cv.imwrite('./CameraCalibration/cameraCal1.png', dst)
 
 # Reprojection Error Calculation
 # 0 is best
