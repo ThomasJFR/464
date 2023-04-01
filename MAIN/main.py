@@ -17,10 +17,11 @@ import numpy as np
 #import SafePSM
 from calibration import calibrate_z
 from moves import traverse_to_location, move_vertical, home_ecm
+from arms import initializePSM, initializeECM 
+#from vision import capture_system, extract_system_features
+#from collision import collision_risk
+#from psm_state_machine import PSMState
 from utils import FakeWaiter, PSMSequence, dist
-from vision import capture_system, extract_system_features
-from collision import collision_risk
-from psm_state_machine import PSMState
 
 items = deque()
 bowls = list()
@@ -46,34 +47,6 @@ def dispatch_bowl(p):
     bowl = bowls[0] if (p.name() == "PSM1") else bowls[-1]  # bowls[0] is closest to psm1; bowls[-1] to psm2
     return bowl, False
 
-
-def initializePSM(arm_name):
-    """
-    This is a function to initialize and home each arm, and to send each arm to the 
-    mainloop once initialized.
-    """
-    # Initialize arm
-    p = dvrk.psm(arm_name) #SafePSM(arm_name)
-    
-    # Home the arm
-    p.enable()
-    p.home()
-    sleep(2)  # Necessary for simulator
-    return p
-
-def initializeECM(arm_name):
-    """
-    This is a function to initialize and home each arm, and to send each arm to the 
-    mainloop once initialized.
-    """
-    # Initialize arm
-    e = dvrk.ecm(arm_name)
-
-    # Home the arm
-    e.enable()
-    e.home()
-    sleep(2)
-    return e 
 
 def mainloop(args):
     # State variables
@@ -112,6 +85,7 @@ def mainloop(args):
             #print (psm1_state.has_lock, psm2_state.has_lock)
             lastprint = now // 1
     return time() - start
+
 def tick(psm, state):
     if state.waiter.is_busy():
         return state.s
@@ -214,17 +188,17 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--calibrate", action="store_true", help="Allows user to calibrate the arm before beginning pick-and-place")
     args = parser.parse_args()
 
-    e = initializeECM("ECM")
-    sleep(2)
+    #e = initializeECM("ECM")
+    #sleep(2)
     # SR: Initialize the arms
     #home_ecm().wait()
     print("PSM1 homing...")
     psm1 = initializePSM("PSM1")
-    print("PSM2 homing...")
-    psm2 = initializePSM("PSM2")
+    print("PSM3 homing...")
+    psm2 = initializePSM("PSM3")
 
     print("Homing ECM")
-    home_ecm(e).wait()
+    #home_ecm(e).wait()
     
     # SR: Calibrate the z of the table, if requested
     if args.calibrate:
@@ -237,16 +211,16 @@ if __name__ == "__main__":
     #psm1.safe_home().wait()
     #psm2.safe_home().wait()
     # SR: Retrieve image of system from camera and extract features 
-    image = capture_system()
-    features = extract_system_features(image)
+    #image = capture_system()
+    #features = extract_system_features(image)
 
     # SR: Generate features
     # Sort the items and bowls by their positions such that
     # items closer to psm1 appear on the left side of the list.
     # TODO Fix the bad global pattern
     sort_by_y = lambda xyz: xyz[1]
-    items = deque(sorted(features["items"], key=sort_by_y))
-    bowls = list(sorted(features["bowls"], key=sort_by_y))
+    items = deque([np.array([0,0,z_calibrated])]) #deque(sorted(features["items"], key=sort_by_y))
+    bowls = [np.array([0,0.05,z_calibrated])]#list(sorted(features["bowls"], key=sort_by_y))
     if args.calibrate:
         for i in range(len(items)):
             items[i][2] = z_calibrated 
