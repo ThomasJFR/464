@@ -7,22 +7,26 @@ import os
 # checkerboard size (count interior corners only, eg. a chessboard is 7x7 not 9x9)
 rows = 6
 columns = 7
-
 # image rescale percentage
 scale_percent = 50
-
-# calibration photos array
-images = glob.glob(os.path.join("./calibration photos", "*.png"))
-
+# calibration photos filepath
+calib_photos_path = os.path.join("./calibration photos", "*.png")
+# filepath for photo to test undistortion (and calculate reproduction error)
+test_photo_path = './calibration photos/cameraCal7.png'
+# filepath for undistorted photo
+undist_photo_path = './calibration photos/calibresult.png'
 #---------------------------------------------
 
+# -----------------MAIN CODE BODY-----------------
+images = glob.glob(calib_photos_path)
+
 def resize(img, scale_percent):
-    print('Original Dimensions : ',img.shape)
+    # print('Original Dimensions : ',img.shape)
     width = int(img.shape[1] * scale_percent / 100)
     height = int(img.shape[0] * scale_percent / 100)
     dim = (width, height)
     img = cv.resize(img, dim, interpolation = cv.INTER_AREA)
-    print('Resized Dimensions : ',img.shape)
+    # print('Resized Dimensions : ',img.shape)
     return img
 
 # termination criteria
@@ -49,7 +53,6 @@ for fname in images:
 
     # Find the (interior) chess board corners
     ret, corners = cv.findChessboardCorners(gray, (rows,columns), None)
-    print(ret)
 
     # If found, add object points, image points (after refining them)
     if ret == True:
@@ -60,6 +63,9 @@ for fname in images:
         # Draw and display the corners
         cv.drawChessboardCorners(img, (rows,columns), corners2, ret)
         cv.imshow('img', img)
+        print('Success: ' + fname)
+    else: 
+        print('Failed to detect checkerboard: ' + fname)
 
 cv.destroyAllWindows()
 
@@ -68,7 +74,7 @@ cv.destroyAllWindows()
 ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 
 # Undistortion
-img = cv.imread('./calibration photos/cameraCal7.png')
+img = cv.imread(test_photo_path)
 img = resize(img,scale_percent)
 h,  w = img.shape[:2]
 newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
@@ -77,7 +83,7 @@ dst = cv.undistort(img, mtx, dist, None, newcameramtx)
 # crop the image
 x, y, w, h = roi
 dst = dst[y:y+h, x:x+w]
-cv.imwrite('./calibration photos/calibresult.png', dst)
+cv.imwrite(undist_photo_path, dst)
 
 # Reprojection Error Calculation
 # 0 is best
