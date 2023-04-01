@@ -79,11 +79,11 @@ def mainloop(args):
             else:
                 psm2_state.waiter = FakeWaiter()
         
-        if now // 1 > lastprint:
+        if now - lastprint > 0.5:
             print ("PSM1: %s\tPSM2: %s" % (psm1_state.s, psm2_state.s))
             #print (collision_risk(psm1_state, psm2_state))
             #print (psm1_state.has_lock, psm2_state.has_lock)
-            lastprint = now // 1
+            lastprint = now
     return time() - start
 
 def tick(psm, state):

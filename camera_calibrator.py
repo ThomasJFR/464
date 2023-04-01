@@ -3,6 +3,19 @@ import cv2 as cv
 import glob
 import os
 
+# -----------------USER INPUT-----------------
+# checkerboard size (count interior corners only, eg. a chessboard is 7x7 not 9x9)
+rows = 6
+columns = 7
+
+# image rescale percentage
+scale_percent = 50
+
+# calibration photos array
+images = glob.glob(os.path.join("./calibration photos", "*.png"))
+
+#---------------------------------------------
+
 def resize(img, scale_percent):
     print('Original Dimensions : ',img.shape)
     width = int(img.shape[1] * scale_percent / 100)
@@ -35,7 +48,7 @@ for fname in images:
     gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
     cv.imshow('gray',gray)
-    cv.waitKey(1000)
+    cv.waitKey(500)
 
     # Find the (interior) chess board corners
     ret, corners = cv.findChessboardCorners(gray, (9,4), None)
@@ -47,7 +60,7 @@ for fname in images:
         imgpoints.append(corners2)
 
         # Draw and display the corners
-        cv.drawChessboardCorners(img, (7,6), corners2, ret)
+        cv.drawChessboardCorners(img, (rows,columns), corners2, ret)
         cv.imshow('img', img)
 
 cv.destroyAllWindows()
