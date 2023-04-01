@@ -23,4 +23,4 @@ class PSMState:
         self.target = None
         self.waiter = FakeWaiter()
         self.has_lock = False
-
+        self.zcal = None

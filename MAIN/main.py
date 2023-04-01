@@ -16,16 +16,16 @@ import numpy as np
 # Created
 #import SafePSM
 from calibration import calibrate_z
-from moves import traverse_to_location, move_vertical, home_ecm
+from moves import traverse_to_location, move_vertical, home_ecm, safe_retract
 from arms import initializePSM, initializeECM 
 #from vision import capture_system, extract_system_features
-#from collision import collision_risk
-#from psm_state_machine import PSMState
+from collision import collision_risk
+from psm_state_machine import PSMState
 from utils import FakeWaiter, PSMSequence, dist
 
 items = deque()
 bowls = list()
-Z_OFFSET = 0.05
+Z_OFFSET = 0.04
 
 def dispatch_item(p):
     """
@@ -52,14 +52,15 @@ def mainloop(args):
     # State variables
     psm1, psm2 = args["PSM1"], args["PSM2"]
     psm1_state, psm2_state = PSMState(), PSMState() 
+    psm1_state.zcal, psm2_state.zcal = args["PSM1_ZCAL"], args["PSM2_ZCAL"]
     psm1_active, psm2_active = True,  True
 
     start = time()
     lastprint = 0
     while psm1_active or psm2_active:
         now = time()
-        psm1_active = psm1_state.s is not PSMState.s.Finished
-        psm2_active = psm2_state.s is not PSMState.s.Finished
+        psm1_active = False if not psm1_active else not all([psm1_state.s == PSMState.s.Finished, psm1_state.waiter and not psm1_state.waiter.is_busy()])
+        psm2_active = False if not psm2_active else not all([psm2_state.s == PSMState.s.Finished, psm2_state.waiter and not psm2_state.waiter.is_busy()])
 
         if psm1_active:
             will_collide = collision_risk(psm1, psm1_state, psm2, psm2_state)
@@ -69,6 +70,7 @@ def mainloop(args):
                 psm1_state.s = tick(psm1, psm1_state)
             else:
                 psm1_state.waiter = FakeWaiter()
+            sleep(0.1)
         
         if psm2_active:
             will_collide = collision_risk(psm1, psm1_state, psm2, psm2_state)
@@ -78,12 +80,14 @@ def mainloop(args):
                 psm2_state.s = tick(psm2, psm2_state)
             else:
                 psm2_state.waiter = FakeWaiter()
-        
+            sleep(0.1)
+
         if now - lastprint > 0.5:
             print ("PSM1: %s\tPSM2: %s" % (psm1_state.s, psm2_state.s))
             #print (collision_risk(psm1_state, psm2_state))
             #print (psm1_state.has_lock, psm2_state.has_lock)
             lastprint = now
+
     return time() - start
 
 def tick(psm, state):
@@ -101,10 +105,10 @@ def tick(psm, state):
         state.target, fault = dispatch_item(psm)
         if fault:
             # EXIT POINT: No more items to collect.
-            state.waiter = FakeWaiter()
-            psm.move_jp(np.zeros(6))
+            state.waiter = safe_retract(psm) 
             return PSMState.s.Finished
         else:
+            state.target[2] = state.zcal
             print psm.name() + " target: " + str(state.target)
             return PSMState.s.MoveToItem
     
@@ -117,7 +121,6 @@ def tick(psm, state):
         return state.s #if state.waiter.is_busy() else PSMState.s.Grab
 
     elif state.s == PSMState.s.Grab:
-        #print(psm.name() + " GRABBING!")
         state.waiter = PSMSequence([
             psm.jaw.open,
             (move_vertical, (psm, -Z_OFFSET)),
@@ -134,14 +137,15 @@ def tick(psm, state):
             # EXIT POINT: No bowl detected
             return PSMState.s.Standby
         
-        if psm.name() == "PSM1":
-            return PSMState.s.MoveToBowl
-        else:
-            return PSMState.s.ApproachBowl
+        state.target[2] = state.zcal
+        #if psm.name() == "PSM1":
+        return PSMState.s.MoveToBowl
+        #else:
+        #    return PSMState.s.ApproachBowl
 
     elif state.s == PSMState.s.ApproachBowl:
         approach_target = np.array([x for x in state.target])
-        approach_target[1] += 0.05 *(-1 if psm.name() == "PSM1" else 1)
+        approach_target[1] += 0.05 *(1 if psm.name() == "PSM1" else -1)
         
         if dist(psm.measured_cp().p, approach_target, xy=True) <= 0.01:
             return PSMState.s.MoveToBowl
@@ -162,10 +166,10 @@ def tick(psm, state):
         ])
         # In coppeliasim, PSM1 crashes if we go to the blue bowl.
         # TODO Fix this later
-        if psm.name() == "PSM1":
-            return PSMState.s.Home
-        else:
-            return PSMState.s.BackOffBowl
+        #if psm.name() == "PSM1":
+        return PSMState.s.Home
+        #else:
+        #    return PSMState.s.BackOffBowl
  
     elif state.s == PSMState.s.BackOffBowl:
         approach_target = np.array([x for x in state.target])
@@ -201,11 +205,25 @@ if __name__ == "__main__":
     #home_ecm(e).wait()
     
     # SR: Calibrate the z of the table, if requested
-    if args.calibrate:
+    def calibrate_routine(psm):
         print("------------------------------------------")
         print("-  TOUCH PSM1 TIP TO TABLE TO CALIBRATE  -")
         print("------------------------------------------")
-        z_calibrated = calibrate_z(psm1)  # Hangs the thread
+        z_calibrated = calibrate_z(psm)  # Hangs the thread
+        print("Calibrated at ", psm.setpoint_cp().p) 
+        return z_calibrated 
+    
+
+    # FOR NOW, FORCE CAL
+    args.calibrate = True
+    psm1_zc = calibrate_routine(psm1) if args.calibrate else psm1.setpoint_cp().p[2]
+    psm2_zc = calibrate_routine(psm2) if args.calibrate else psm2.setpoint_cp().p[2]
+ 
+    
+    w1 = safe_retract(psm1)
+    w2 = safe_retract(psm2)
+    while any([w1.is_busy(), w2.is_busy()]):
+        continue
 
     # SR: Move the arms out of the way
     #psm1.safe_home().wait()
@@ -213,23 +231,39 @@ if __name__ == "__main__":
     # SR: Retrieve image of system from camera and extract features 
     #image = capture_system()
     #features = extract_system_features(image)
-
+    features = {
+        "items": [
+            np.array([0,0,0.01]),
+            np.array([0.02,-0.03,0.01]),
+            np.array([0.03,0.02,0]),
+            np.array([-0.05,-0.1,0.01]),
+            np.array([0,-0.1,0]),
+        ],
+        "bowls": [
+            np.array([-0.07,0.05, 0]),
+            np.array([0.08,-0.16, 0]),
+        ]
+    }
     # SR: Generate features
     # Sort the items and bowls by their positions such that
     # items closer to psm1 appear on the left side of the list.
     # TODO Fix the bad global pattern
-    sort_by_y = lambda xyz: xyz[1]
-    items = deque([np.array([0,0,z_calibrated])]) #deque(sorted(features["items"], key=sort_by_y))
-    bowls = [np.array([0,0.05,z_calibrated])]#list(sorted(features["bowls"], key=sort_by_y))
-    if args.calibrate:
+    sort_by_y = lambda xyz: -xyz[1]
+    items = list(sorted(features["items"], key=sort_by_y))
+    bowls = list(sorted(features["bowls"], key=sort_by_y))
+    if False:#args.calibrate:
         for i in range(len(items)):
-            items[i][2] = z_calibrated 
+            items[i][2] = z_calibrated
         for i in range(len(bowls)):
             bowls[i][2] = z_calibrated 
+    items = deque(items)
+
     # Let the games begin!
     elapsed = mainloop({
         "PSM1": psm1,
+        "PSM1_ZCAL": psm1_zc,
         "PSM2": psm2,
+        "PSM2_ZCAL": psm2_zc
     })
     print("Task finished. Elpsed time: %ds" % elapsed)
 

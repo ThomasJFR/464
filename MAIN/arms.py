@@ -1,6 +1,9 @@
 import dvrk
 from time import sleep
 import numpy as np
+from moves import safe_retract
+from utils import PSMSequence
+
 def initializePSM(arm_name):
     """
     This is a function to initialize and home each arm, and to send each arm to the 
@@ -14,9 +17,8 @@ def initializePSM(arm_name):
     p.home()
     sleep(2)  # Necessary for simulator
 
-    p.trajectory_j_set_ratio(0.01)
-    p.move_jp(np.zeros(6)).wait()
-
+    p.trajectory_j_set_ratio(0.65)
+    safe_retract(p).wait()
     return p
 
 def initializeECM(arm_name):
@@ -35,5 +37,3 @@ def initializeECM(arm_name):
     e.trajectory_j_set_ratio(0.05)
 
     return e 
-
-

@@ -29,14 +29,23 @@ class PSMSequence:
         """
         Returns whether the ticker has run down
         """
-        if self.__waiter and self.__waiter.is_busy():
+        if self.__waiter is None:
+            self.next()
+            return False
+
+        busy = self.__waiter.is_busy()
+        if busy: 
             return False
         elif len(self.__actions) > 0:
-            action_fun = self.__actions.pop()
-            args = self.__args.pop()
-            self.__waiter = action_fun(*args) 
+            self.next()
+            return False
         else:
             return True
+
+    def next(self):
+        action_fun = self.__actions.pop()
+        args = self.__args.pop()
+        self.__waiter = action_fun(*args) 
 
     def is_busy(self):
         #self.tick()
