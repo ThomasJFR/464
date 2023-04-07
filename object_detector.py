@@ -7,11 +7,6 @@ import threading
 # from tracker import *
 import time
 
-# -----------------USER INPUT-----------------
-# filepath to photo for analysis
-path_detectimage = './visionDebuggerImages/sampleImage1.png'
-# frame rescaling percentage
-frame_scale = 0.2
 # BGR upper and lower bounds for detection (0-255)
 lowB = 0
 lowG = 0
@@ -19,54 +14,82 @@ lowR = 100
 highB = 100
 highG = 80
 highR = 255
-#---------------------------------------------
 
-# Create an instance of TKinter Window or frame
-win= Tk()
+# Array of center positions
+cx = []
+cy = []
 
-# Set the size of the window
-win.geometry("1000x500")# Create a Label to capture the Video frames
+def main(cap):
+    global lowB
+    global lowG
+    global lowR
 
-imageLabel = Label(win)
-imageLabel.place(x = 0, y = 80)
+    global highB
+    global highG 
+    global highR 
 
-outLabel = Label(win)
-outLabel.place(x = 500, y = 80)
+    global cx
+    global cy
 
-ballPosLabel = Label(text = "Ball Position",bd =4)
-ballPosLabel.place(x = 250, y = 10)
+    # -----------------USER INPUT-----------------
+    # filepath to photo for analysis
+    # path_detectimage = './visionDebuggerImages/sampleImage1.png'
+    # frame rescaling percentage
+    frame_scale = 0.2
+    #---------------------------------------------
 
-# BGR Inputs:
-data1_text = StringVar()
-data2_text = StringVar()
-data3_text = StringVar()
-data4_text = StringVar()
-data5_text = StringVar()
-data6_text = StringVar()
+    # Create an instance of TKinter Window or frame
+    win= Tk()
 
-data1_entry = Entry(textvariable = data1_text, width = 5)
-data2_entry = Entry(textvariable = data2_text, width = 5)
-data3_entry = Entry(textvariable = data3_text, width = 5)
-data4_entry = Entry(textvariable = data4_text, width = 5)
-data5_entry = Entry(textvariable = data5_text, width = 5)
-data6_entry = Entry(textvariable = data6_text, width = 5)
+    # Set the size of the window
+    win.geometry("1000x500")# Create a Label to capture the Video frames
 
-data1_entry.place(x = 10, y = 40)
-data2_entry.place(x = 40, y = 40)
-data3_entry.place(x = 70, y = 40)
-data4_entry.place(x = 120, y = 40)
-data5_entry.place(x = 150, y = 40)
-data6_entry.place(x = 180, y = 40)
+    imageLabel = Label(win)
+    imageLabel.place(x = 0, y = 80)
 
-data1_text.set(lowB)
-data2_text.set(lowG)
-data3_text.set(lowR)
-data4_text.set(highB)
-data5_text.set(highG)
-data6_text.set(highR)
+    outLabel = Label(win)
+    outLabel.place(x = 500, y = 80)
 
-cap = cv2.imread(path_detectimage)
-# cap = cv2.VideoCapture(0)
+    ballPosLabel = Label(text = "Ball Position",bd =4)
+    ballPosLabel.place(x = 250, y = 10)
+
+    # BGR Inputs:
+    data1_text = StringVar()
+    data2_text = StringVar()
+    data3_text = StringVar()
+    data4_text = StringVar()
+    data5_text = StringVar()
+    data6_text = StringVar()
+
+    data1_entry = Entry(textvariable = data1_text, width = 5)
+    data2_entry = Entry(textvariable = data2_text, width = 5)
+    data3_entry = Entry(textvariable = data3_text, width = 5)
+    data4_entry = Entry(textvariable = data4_text, width = 5)
+    data5_entry = Entry(textvariable = data5_text, width = 5)
+    data6_entry = Entry(textvariable = data6_text, width = 5)
+
+    data1_entry.place(x = 10, y = 40)
+    data2_entry.place(x = 40, y = 40)
+    data3_entry.place(x = 70, y = 40)
+    data4_entry.place(x = 120, y = 40)
+    data5_entry.place(x = 150, y = 40)
+    data6_entry.place(x = 180, y = 40)
+
+    data1_text.set(lowB)
+    data2_text.set(lowG)
+    data3_text.set(lowR)
+    data4_text.set(highB)
+    data5_text.set(highG)
+    data6_text.set(highR)
+
+    # cap = cv2.imread(path_detectimage)
+    # cap = cv2.VideoCapture(0)
+
+    # Repeat after an interval to capture continiously
+    # threading.Thread(target = processCV).start()
+    # win.mainloop()
+
+    return cx,cy
 
 def rescaleFrame(frame, scale):
     """ Rescales the frame of the OpenCV image
@@ -127,11 +150,14 @@ def processCV():
     global highG 
     global highR 
 
+    global cx
+    global cy
+
     while(True):
       # Get the latest frame and convert into Image
         # avail, frame = cap.read()
         avail = True # Can remove all avails
-        frame = rescaleFrame(cap,frame_scale)
+        
 
         readBGRBoxes()
 
@@ -169,6 +195,9 @@ def processCV():
                     i += 1
 
             i -= 1
+
+            frame = rescaleFrame(frame,frame_scale)
+
             # Convert to RBG Image
             cv2image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
             cv2out = cv2.cvtColor(output,cv2.COLOR_BGR2RGB)
@@ -187,7 +216,5 @@ def processCV():
             # ballPosLabel['text'] = str(cx[i])+","+str(cy[i])
             time.sleep(0.014) # Bug from Trevors implementation, only needed for live feed
 
-# Repeat after an interval to capture continiously
-
-threading.Thread(target = processCV).start()
-win.mainloop()
+if __name__ == '__main__':
+    main(cv2.imread('./visionDebuggerImages/sampleImage1.png'))

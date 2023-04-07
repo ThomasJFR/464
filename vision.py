@@ -6,6 +6,10 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 # OpenCV2 for saving an image
 import cv2
+# import object detector script
+import object_detector as detector
+# import camera calibrator script
+import camera_calibrator as calibrator
 # import other useful packages
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,6 +36,8 @@ def main():
     # img = cv2.imread('visionDebuggerImages/sampleImage4.png',0) # load debugger image
     # img = cv2.imread('cameraImage.png',0) # load actual image
     x,y = objectLocator(img)
+
+    return x,y
 
 def imageTopic(platform,cameraChoice):
     image_topic = "N/A"
@@ -69,45 +75,15 @@ def saveImage(msg):
 
 
 def objectLocator(img):
-    # TO DO: undistort image from calibration
-
-    # TO DO: fix code below because it isn't segmenting colours properly
-
-    # Apply Gaussian blur filter to image a bit
-    img = cv2.GaussianBlur(img, (3,3), 0) 
-
-    # convert to RGB (not working for some reason?)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # img = cv2.Sobel(src=img, ddepth=cv2.CV_64F, dx=1, dy=1, ksize=3) # attempt sobel algorithm for edge detection
-
-    plt.imshow(img)
-    plt.show()
+    # Undistort image from calibration
+    img_undistorted = calibrator.main(img)
     
-    # convert to float
-    img = np.float32(img)
+    # Give image to detector to locate objects in image frame
+    cx,cy = detector.main(img_undistorted)
 
-    # define stopping criteria
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.2)
-
-    # Use k means clustering to segment image into black and red
-    k = 3
-    _, labels, (centers) = cv2.kmeans(img, k, None, criteria, 5, cv2.KMEANS_RANDOM_CENTERS)
-
-    # convert back to 8 bit values
-    centers = np.uint8(centers)
-
-    # flatten the labels array
-    labels = labels.flatten()
-
-    # convert all pixels to the color of the centroids
-    segImg = centers[labels.flatten()]
-    
-    # reshape back to the original image dimension
-    segImg = segImg.reshape(img.shape)
-
-    # show the segmented image
-    plt.imshow(segImg)
-    plt.show()
+    # Transform coordinates such that origin is at centre and is in middle of the image
+    # TO DO
+    # convert cx and cy to x and y
 
     x = 0
     y = 0
