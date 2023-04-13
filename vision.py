@@ -32,8 +32,8 @@ def main():
     sub.unregister() # unsubscribe
 
     # extract location of red objects
-    img = cv2.imread('visionDebuggerImages/cameraImageDebugger.png',0) # load debugger image
-    # img = cv2.imread('visionDebuggerImages/sampleImage4.png',0) # load debugger image
+    # img = cv2.imread('visionDebuggerImages/cameraImageDebugger.png',0) # load debugger image
+    img = cv2.imread('visionDebuggerImages/sampleImage4.png',0) # load debugger image
     # img = cv2.imread('cameraImage.png',0) # load actual image
     x,y = objectLocator(img)
 
@@ -73,7 +73,6 @@ def saveImage(msg):
         cv2.imwrite('cameraImage.png', cv2_img) # save image
         print("Image saved!")
 
-
 def objectLocator(img):
     # Undistort image from calibration
     img_undistorted = calibrator.main(img)
@@ -84,7 +83,8 @@ def objectLocator(img):
     # Transform coordinates such that origin is at centre and is in middle of the image
     # TO DO
     # convert cx and cy to x and y
-
+    print(cx)
+    print(cy)
     x = 0
     y = 0
     return x,y

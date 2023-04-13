@@ -3,7 +3,7 @@ import cv2 as cv
 import glob
 import os
 
-def main(img):
+def main(imgInput):
     # -----------------USER INPUT-----------------
     # checkerboard size (count interior corners only, eg. a chessboard is 7x7 not 9x9)
     rows = 6
@@ -43,8 +43,8 @@ def main(img):
 
         gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
-        cv.imshow('gray',gray)
-        cv.waitKey(500)
+        # cv.imshow('gray',gray)
+        # cv.waitKey(500)
 
         # Find the (interior) chess board corners
         ret, corners = cv.findChessboardCorners(gray, (rows,columns), None)
@@ -57,7 +57,7 @@ def main(img):
 
             # Draw and display the corners
             cv.drawChessboardCorners(img, (rows,columns), corners2, ret)
-            cv.imshow('img', img)
+            # cv.imshow('img', img)
             print('Success: ' + fname)
         else: 
             print('Failed to detect checkerboard: ' + fname)
@@ -70,7 +70,7 @@ def main(img):
 
     # Undistortion
     # img = cv.imread(test_photo_path)
-    img = resize(img,scale_percent)
+    img = resize(imgInput,scale_percent)
     h,  w = img.shape[:2]
     newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
 

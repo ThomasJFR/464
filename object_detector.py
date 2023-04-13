@@ -19,6 +19,19 @@ highR = 255
 cx = []
 cy = []
 
+# Text
+data1_text = ''
+data2_text = ''
+data3_text = ''
+data4_text = ''
+data5_text = ''
+data6_text = ''
+imageLabel = ''
+outLabel = ''
+
+# frame rescaling percentage
+frame_scale = 0.2
+
 def main(cap):
     global lowB
     global lowG
@@ -31,11 +44,20 @@ def main(cap):
     global cx
     global cy
 
+    global data1_text
+    global data2_text
+    global data3_text
+    global data4_text
+    global data5_text
+    global data6_text
+    global outLabel
+    global imageLabel
+
+    global frame_scale
+
     # -----------------USER INPUT-----------------
     # filepath to photo for analysis
     # path_detectimage = './visionDebuggerImages/sampleImage1.png'
-    # frame rescaling percentage
-    frame_scale = 0.2
     #---------------------------------------------
 
     # Create an instance of TKinter Window or frame
@@ -86,8 +108,10 @@ def main(cap):
     # cap = cv2.VideoCapture(0)
 
     # Repeat after an interval to capture continiously
-    # threading.Thread(target = processCV).start()
+    # threading.Thread(target = processCV(cap)).start()
     # win.mainloop()
+
+    processCV(cap)
 
     return cx,cy
 
@@ -141,7 +165,7 @@ def readBGRBoxes():
         highR = 0
 
 # Define function to show frame
-def processCV():
+def processCV(cap):
     global lowB
     global lowG
     global lowR
@@ -153,68 +177,79 @@ def processCV():
     global cx
     global cy
 
-    while(True):
-      # Get the latest frame and convert into Image
-        # avail, frame = cap.read()
-        avail = True # Can remove all avails
-        
+    global data1_text
+    global data2_text
+    global data3_text
+    global data4_text
+    global data5_text
+    global data6_text
+    global outLabel
+    global imageLabel
 
-        readBGRBoxes()
+    global frame_scale
 
-        # Do all image transforms before here
+    # while(True):
+    # Get the latest frame and convert into Image
+    # avail, frame = cap.read()
+    avail = True # Can remove all avails
+    frame = rescaleFrame(cap,1)
+    readBGRBoxes()
+    cv2.imshow('img',frame)
+    cv2.waitKey(1000)
+    # Do all image transforms before here
 
-        if(avail != False):
-            # Lower bound and upper bound for red
-            lower_bound = np.array([lowB, lowG, lowR])     
-            upper_bound = np.array([highB, highG, highR])
+    if(avail != False):
+        # Lower bound and upper bound for red
+        lower_bound = np.array([lowB, lowG, lowR])     
+        upper_bound = np.array([highB, highG, highR])
 
-            # Create mask based on bounds
-            mask = cv2.inRange(frame, lower_bound, upper_bound)
-            output = cv2.bitwise_and(frame, frame, mask=mask)
+        # Create mask based on bounds
+        mask = cv2.inRange(frame, lower_bound, upper_bound)
+        output = cv2.bitwise_and(frame, frame, mask=mask)
 
-            _, mask = cv2.threshold(mask, 254, 255, cv2.THRESH_BINARY)
+        _, mask = cv2.threshold(mask, 254, 255, cv2.THRESH_BINARY)
 
-            # Find contours
-            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        # Find contours
+        contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-            # Find the size and position of the largest contour
-            minContour = 40 # Adjust at will
-            cx = []
-            cy = []
-            i = 0
-            for cnt in contours:
-                # cv2.drawContours(frame, [cnt], -1, (0, 255, 0), 2)
-                area = cv2.contourArea(cnt)
-                if area > minContour:
-                    x, y, w, h = cv2.boundingRect(cnt)
-                    # Draw Center and Bounding Box of the contour
-                    cx.append(int((x + x + w)/2))
-                    cy.append(int((y + y + h)/2))
-                    cv2.circle(frame, (cx[i], cy[i]), 3, (255,0,0), -1) 
-                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
-                    i += 1
+        # Find the size and position of the largest contour
+        minContour = 40 # Adjust at will
+        cx = []
+        cy = []
+        i = 0
+        for cnt in contours:
+            # cv2.drawContours(frame, [cnt], -1, (0, 255, 0), 2)
+            area = cv2.contourArea(cnt)
+            if area > minContour:
+                x, y, w, h = cv2.boundingRect(cnt)
+                # Draw Center and Bounding Box of the contour
+                cx.append(int((x + x + w)/2))
+                cy.append(int((y + y + h)/2))
+                cv2.circle(frame, (cx[i], cy[i]), 3, (255,0,0), -1) 
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
+                i += 1
 
-            i -= 1
+        i -= 1
 
-            frame = rescaleFrame(frame,frame_scale)
+        frame = rescaleFrame(frame,frame_scale)
 
-            # Convert to RBG Image
-            cv2image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-            cv2out = cv2.cvtColor(output,cv2.COLOR_BGR2RGB)
-            img = Image.fromarray(cv2image)
-            out = Image.fromarray(cv2out)
+        # Convert to RBG Image
+        cv2image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+        cv2out = cv2.cvtColor(output,cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(cv2image)
+        out = Image.fromarray(cv2out)
 
-            # Convert Image to PhotoImage
-            imgtk = ImageTk.PhotoImage(image = img)
-            imageLabel.imgtk = imgtk
-            imageLabel.configure(image=imgtk)
+        # Convert Image to PhotoImage
+        imgtk = ImageTk.PhotoImage(image = img)
+        imageLabel.imgtk = imgtk
+        imageLabel.configure(image=imgtk)
 
-            outtk = ImageTk.PhotoImage(image = out)
-            outLabel.mastk = outtk
-            outLabel.configure(image=outtk)
+        outtk = ImageTk.PhotoImage(image = out)
+        outLabel.mastk = outtk
+        outLabel.configure(image=outtk)
 
-            # ballPosLabel['text'] = str(cx[i])+","+str(cy[i])
-            time.sleep(0.014) # Bug from Trevors implementation, only needed for live feed
+        # ballPosLabel['text'] = str(cx[i])+","+str(cy[i])
+        time.sleep(0.014) # Bug from Trevors implementation, only needed for live feed
 
 if __name__ == '__main__':
     main(cv2.imread('./visionDebuggerImages/sampleImage1.png'))
