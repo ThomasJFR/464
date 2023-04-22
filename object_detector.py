@@ -16,8 +16,8 @@ highG = 80
 highR = 255
 
 # Array of center positions
-cx = []
-cy = []
+cx = np.array([])
+cy = np.array([])
 
 # Text
 data1_text = ''
@@ -30,7 +30,7 @@ imageLabel = ''
 outLabel = ''
 
 # frame rescaling percentage
-frame_scale = 0.2
+frame_scale = 0.5
 
 def main(cap):
     global lowB
@@ -199,6 +199,7 @@ def processCV(cap):
     # Do all image transforms before here
 
     if(avail != False):
+        frame = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         # Lower bound and upper bound for red
         lower_bound = np.array([lowB, lowG, lowR])     
         upper_bound = np.array([highB, highG, highR])
@@ -213,26 +214,24 @@ def processCV(cap):
         contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         # Find the size and position of the largest contour
-        minContour = 40 # Adjust at will
-        cx = []
-        cy = []
+        minContour = 2 # Adjust at will
         i = 0
         for cnt in contours:
-            # cv2.drawContours(frame, [cnt], -1, (0, 255, 0), 2)
+            cv2.drawContours(frame, [cnt], -1, (0, 255, 0), 2)
             area = cv2.contourArea(cnt)
             if area > minContour:
                 x, y, w, h = cv2.boundingRect(cnt)
                 # Draw Center and Bounding Box of the contour
-                cx.append(int((x + x + w)/2))
-                cy.append(int((y + y + h)/2))
-                cv2.circle(frame, (cx[i], cy[i]), 3, (255,0,0), -1) 
+                cxi = int((x + x + w)/2)
+                cyi = int((y + y + h)/2)
+                cx = np.append(cx,cxi)
+                cy = np.append(cy,cyi)
+                cv2.circle(frame, (cxi, cyi), 3, (255,0,0), -1) 
                 cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 1)
                 i += 1
-
         i -= 1
-
-        frame = rescaleFrame(frame,frame_scale)
-
+        # frame = rescaleFrame(frame,frame_scale)
+        
         # Convert to RBG Image
         cv2image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
         cv2out = cv2.cvtColor(output,cv2.COLOR_BGR2RGB)
@@ -251,5 +250,8 @@ def processCV(cap):
         # ballPosLabel['text'] = str(cx[i])+","+str(cy[i])
         time.sleep(0.014) # Bug from Trevors implementation, only needed for live feed
 
+        cv2.imshow('img',frame)
+        cv2.waitKey(2000)
+    
 if __name__ == '__main__':
     main(cv2.imread('./visionDebuggerImages/sampleImage1.png'))
