@@ -9,13 +9,13 @@ def main(imgInput):
     rows = 6
     columns = 7
     # image rescale percentage
-    scale_percent = 50
+    scale_percent = 100
     # calibration photos filepath
-    calib_photos_path = os.path.join("./calibration photos", "*.png")
+    calib_photos_path = os.path.join("./CameraCalibration", "*.png")
     # filepath for photo to test undistortion (and calculate reproduction error)
-    test_photo_path = './calibration photos/cameraCal7.png'
+    test_photo_path = './CameraCalibration/cameraCal7.png'
     # filepath for undistorted photo
-    undist_photo_path = './calibration photos/calibresult.png'
+    undist_photo_path = './CameraCalibration/calibresult.png'
     #---------------------------------------------
 
     # -----------------MAIN CODE BODY-----------------
@@ -32,8 +32,7 @@ def main(imgInput):
     objpoints = [] # 3d point in real world space
     imgpoints = [] # 2d points in image plane.
 
-    images = glob.glob(os.path.join("./CameraCalibration", "*.png"))
-    scale_percent = 100
+    images = glob.glob(calib_photos_path)
 
     for fname in images:
         img = cv.imread(fname)
@@ -69,7 +68,7 @@ def main(imgInput):
     ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
 
     # Undistortion
-    # img = cv.imread(test_photo_path)
+    img = cv.imread(test_photo_path)
     img = resize(imgInput,scale_percent)
     h,  w = img.shape[:2]
     newcameramtx, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w,h), 1, (w,h))
