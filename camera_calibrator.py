@@ -16,6 +16,8 @@ calib_photos_path = os.path.join("./CameraCalibration", "*.png")
 test_photo_path = './CameraCalibration/cameraCal7.png'
 # filepath for undistorted photo
 undist_photo_path = './CameraCalibration/calibresult.png'
+# size of each individual chessboard square in mm
+mm_per_square = 9 # mm
 #---------------------------------------------
 
 # -----------------MAIN CODE BODY-----------------
@@ -94,19 +96,21 @@ gray = cv.cvtColor(dst, cv.COLOR_BGR2GRAY)
 patternFound, corners = cv.findChessboardCorners(gray, (rows,columns), None)
 if(patternFound): # refines the corner location
     corners2 = cv.cornerSubPix(gray,corners, (11,11), (-1,-1), criteria)
-# get min/max x,y coordinates (used to locate the outermost 4 corners)
-max_x = max(corners2[:,0,0])
-min_x = min(corners2[:,0,0])
-max_y = max(corners2[:,0,1])
-min_y = min(corners2[:,0,1])
-print("min/max x: " + str(min_x) + "/" + str(max_x))
-print("min/max y: " + str(min_y) + "/" + str(max_y))
-# openCV has origin (0,0) at top left of img
-# get indices of the above 4 min/max x/y values and those are the coordinates of corners
-# assumes chessboard is approx square with img
-top_left = 
-
-
+# get distance between first two points
+pt1 = corners2[0,0,:]
+pt2 = corners2[1,0,:]
+dist1 = np.linalg.norm(pt1 - pt2)
+print(dist1)
+# get distance between last two points
+pt1 = corners2[-1,0,:]
+pt2 = corners2[-2,0,:]
+dist2 = np.linalg.norm(pt1 - pt2)
+print(dist2)
+# average the 2 distances and use that as num of pixels per chessboard square
+pixel_per_square = np.mean([dist1,dist2])
+print("pixel per square = " + str(pixel_per_square))
+pixel_per_mm = pixel_per_square/mm_per_square
+print("pixel per mm = " + str(pixel_per_mm))
 
 # return dst
 
