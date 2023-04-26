@@ -1,3 +1,4 @@
+# === comment out below if debugging ===
 # # rospy for the subscriber
 # import rospy
 # # ROS Image message
@@ -5,6 +6,7 @@
 # # ROS Image message -> OpenCV2 image converter
 # from cv_bridge import CvBridge, CvBridgeError
 # OpenCV2 for saving an image
+# ======================================
 import cv2
 # import object detector script
 import object_detector as detector
@@ -15,9 +17,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Instantiate CvBridge
-# bridge = CvBridge()
+# bridge = CvBridge() # === comment out if debugging
 
 def main():
+    # === comment out below if debugging ===
     # rospy.init_node('image_listener')
 
     # platform = raw_input("coppelia OR dvrk: ")
@@ -30,6 +33,7 @@ def main():
     # sub = rospy.Subscriber(image_topic, Image, saveImage)
     # rospy.sleep(0.1) # pause script to save image
     # sub.unregister() # unsubscribe
+    # =======================================
 
     # extract location of red objects
     # img = cv2.imread('visionDebuggerImages/cameraImageDebugger.png') # load debugger image
@@ -63,6 +67,7 @@ def imageTopic(platform,cameraChoice):
     print("rostopic: " + image_topic)
     return image_topic
 
+# === comment out below if debugging ===
 # def saveImage(msg):
 #     print("Received an image")
 #     try:        
@@ -72,21 +77,26 @@ def imageTopic(platform,cameraChoice):
 #     else:
 #         cv2.imwrite('cameraImage.png', cv2_img) # save image
 #         print("Image saved!")
+# =======================================
 
 def objectLocator(img):
     # Undistort image from calibration
-    img_undistorted = calibrator.main(img)
+    img_undistorted,pixel_mm = calibrator.main(img)
+    cv2.imshow('Undistorted img',img_undistorted)
+    cv2.waitKey(2000)
     
-    # Give image to detector to locate objects in image frame
+    # Give image to detector to locate objects, origin at top left corner
     cx,cy = detector.main(img_undistorted)
 
-    # Transform coordinates such that origin is at centre and is in middle of the image
-    # TO DO
-    # convert cx and cy to x and y
-    print(cx)
-    print(cy)
-    x = 0
-    y = 0
+    # Scale coordinates from pixels to metres
+    x = cx / pixel_mm / 1000
+    y = cy / pixel_mm / 1000
+
+    print("x in mm:")
+    print(x*1000)
+    print("y in mm:")
+    print(y*1000)
+
     return x,y
 
 if __name__ == '__main__':
